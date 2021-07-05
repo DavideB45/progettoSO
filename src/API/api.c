@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <errno.h>
 //formatting
 #include <string.h>
 #include <stdlib.h>
@@ -31,7 +32,18 @@ int openConnection(const char* sockname, int msec, const struct timespec abstime
 
 	// va gestita con dei cicli
 	// i timer vanno resettati
-	connect(sockname,(struct sockaddr*) &sa, sizeof(sa));
+	while(connect(sockname,(struct sockaddr*) &sa, sizeof(sa)) == -1){
+		if (errno = ENOENT){
+			//aspetta msec 
+			
+			//controlla se abstime e' finito oppure usare un segnale
+			if(1){
+				;
+			}
+		} else {
+			return -1;
+		}
+	}
 	
 }
 
