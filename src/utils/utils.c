@@ -7,6 +7,7 @@ int intCompare(void* A, void* B){
 	return *((int*) A) - *((int*) B);
 }
 
+
 void Pthread_mutex_lock(pthread_mutex_t *mutex){
 	if(pthread_mutex_lock(mutex) != 0){
 		perror("lock");
