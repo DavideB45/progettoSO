@@ -11,6 +11,7 @@ int main(void){
 	printf("ciao\n");
 	for (size_t i = 0; i < 10; i++){
 		printf("%d\t", i);
+		free(NULL);
 	}
 	printf("\n");
 
