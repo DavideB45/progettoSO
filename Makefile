@@ -4,8 +4,9 @@ LIBS:= -lpthread
 
 .PHONY: all clean
 
-TARGETS:= davide.out server.out
+TARGETS:= davide.out server.out api.out
 SERVEROBJS:= FifoList.o files.o server.o
+APIOBJ:=
 OBJS:= main.o include.o
 
 
