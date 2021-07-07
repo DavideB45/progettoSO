@@ -80,9 +80,9 @@ void endMutexTreeFile(TreeFile* tree){
 
 //non funziona correttamente se chiamata direttamente
 // return 5 se ho sostituito
-// return 4 se gia' esiste
+// return 0 se gia' esiste
 // return 1 se inserimento classico
-int noMutexInsert(TreeNode* root, TreeNode* newNode){
+static int noMutexInsert(TreeNode* root, TreeNode* newNode){
 	if( !(root->flagReal) ){
 		//lo metto al posto di un nodo che c'era ma non era reale
 		free(root->name);
@@ -110,28 +110,26 @@ int noMutexInsert(TreeNode* root, TreeNode* newNode){
 		}
 		return noMutexInsert(root->leftPtr, newNode);
 	}
-	return 4;//elemento gia' presente
+	return 0;//elemento gia' presente
 }
 
 //insert stub non garantice che il puntatore al nodo sia lo stesso
 // inserzione riuscita = 1
-//errori Node = 2   nullTree = 3   alreadyExist = 4
+//errori Node = 2   nullTree = 3   alreadyExist = 0
 int TreeFileinsert(TreeFile* tree , TreeNode* newNode){
 	if(newNode == NULL){
-		printf("newNode insert NULL\n");
+		errno = EFAULT;
 		return 2;
 	}
 	if(newNode->name == NULL){
-		printf("newnode->name insert NULL\n");
+		errno = EFAULT;
 		return 2;
 	}
-	
+	if(tree == NULL){
+		errno = EFAULT;
+		return 3;
+	}
 	startMutexTreeFile(tree);
-		if(tree == NULL){
-			printf("tree insert NULL\n");
-			endMutexTreeFile(tree);
-			return 3;
-		}
 		if(tree->root == NULL){
 			tree->root = newNode;
 			endMutexTreeFile(tree);
@@ -149,34 +147,99 @@ int TreeFileinsert(TreeFile* tree , TreeNode* newNode){
 		}
 		
 	endMutexTreeFile(tree);
+	errno = 0;
 	return ret;
 }
 
-ServerFile* noMutexRemove(TreeNode* root, char* name){
 
+//non funziona correttamente se chiamata direttamente
+static ServerFile* noMutexRemove(TreeNode* root, char* name){
+	if(root == NULL){
+		return NULL;
+	}
+	int compare = strcmp(root->name, name);
+	if(compare < 0){
+		return noMutexRemove(root->rightPtr, name);
+	}
+	if(compare > 0){
+		return noMutexInsert(root->leftPtr, name);
+	}
+
+	if(root->flagReal == 0){
+		return NULL;
+	} else {
+		root->flagReal = 0;
+		ServerFile* toRet = root->sFile;
+///////////////////////////////////////////////////////////////////////////
+		// remove(root->useLRU);
+///////////////////////////////////////////////////////////////////////////
+		root->sFile == NULL;
+		return toRet;
+	}
 }
 
 //remove stub
-/////////////////////////////     DA     ///////////////////////////////////////////
-///////////////////////////// COMPLETARE ///////////////////////////////////////////
+//NULL -> non trovato/bad address
 ServerFile* TreeFileRemove(TreeFile* tree, char* name){
 	if(tree == NULL){
 		printf("tree remove NULL\n");
-		errno  = EINVAL;
+		errno  = EFAULT;
 		return NULL;
 	}
 	if(name == NULL){
 		printf("name remove NULL\n");
-		errno  = EINVAL;
+		errno  = EFAULT;
 		return NULL;
 	}
 	startMutexTreeFile(tree);
-
+		ServerFile* toRet = noMutexRemove(tree->root, name);
 	endMutexTreeFile(tree);
 	errno = 0;
+	return toRet;
 }
 
-//find
+//non funziona correttamente se chiamata direttamente
+static ServerFile* noMutexFind(TreeNode* root, char* name){
+	if(root == NULL){
+		return NULL;
+	}
+	int compare = strcmp(root->name, name);
+	if(compare < 0){
+		return noMutexRemove(root->rightPtr, name);
+	}
+	if(compare > 0){
+		return noMutexInsert(root->leftPtr, name);
+	}
+
+	if(root->flagReal == 0){
+		return NULL;
+	} else {
+///////////////////////////////////////////////////////////////////////////
+		// moveToFront(root->useLRU);
+///////////////////////////////////////////////////////////////////////////
+		return root->sFile;;
+	}
+}
+
+//find stub
+//NULL = invalid argument/ not found
+static ServerFile* TreeFileFind(TreeFile* tree, char* name){
+	if(tree == NULL){
+		printf("tree Find NULL\n");
+		errno  = EFAULT;
+		return NULL;
+	}
+	if(name == NULL){
+		printf("name Find NULL\n");
+		errno  = EFAULT;
+		return NULL;
+	}
+	startMutexTreeFile(tree);
+		ServerFile* toRet = noMutexFind(tree->root, name);
+	endMutexTreeFile(tree);
+	errno = 0;
+	return toRet;
+}
 
 //getNElements
 
