@@ -8,7 +8,8 @@
 #include <sys/types.h>
 #include <sys/un.h>
 #include <unistd.h>
-#include <utils.h>
+#include "../../include/utils.h"
+#include "../../include/api.h"
 
 int sock;
 //connect to the server
@@ -24,7 +25,7 @@ int openConnection(const char* sockname, int msec, const struct timespec abstime
 
 	// va gestita con dei cicli
 	// i timer vanno resettati
-	while(connect(sockname,(struct sockaddr*) &sa, sizeof(sa)) == -1){
+	while(connect(sock,(struct sockaddr*) &sa, sizeof(sa)) == -1){
 		if (errno = ENOENT){
 			//aspetta msec 
 			
