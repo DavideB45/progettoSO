@@ -1,21 +1,9 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
-#include <utils.h>
-#include <FifoList.h>
+#include "../../include/utils.h"
+#include "../../include/FifoList.h"
 
-typedef struct FifoNode{
-	void* data;
-	struct FifoNode *nextPtr;
-}FifoNode;
-
-typedef struct FifoList{
-	int dim;
-	pthread_mutex_t lock;
-	pthread_cond_t wait_to_read;
-	FifoNode* headPtr;
-	FifoNode* queuePtr;
-}FifoList;
 
 //create an empty list
 FifoList* newList(){
