@@ -1,29 +1,29 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include "utils.c"
+#include "utils.c" 
 
 
-typedef struct IntListNode{
+typedef struct GeneralListNode{
 	void* elem;
-	struct IntListNode *nextPtr;
-}IntListNode;
+	struct GeneralListNode *nextPtr;
+}GeneralListNode;
 
-typedef struct IntList{
-	IntListNode *head;
-	IntListNode *queue;
+typedef struct GeneralList{
+	GeneralListNode *head;
+	GeneralListNode *queue;
 	int (*compFun)(void*, void*);
 	void (*freeFun)(void*);
-}IntList;
+}GeneralList;
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////// INT LIST //////////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
 //crea una bella lista
-IntList *newIntList(int (*comp)(void*, void*), void (*freeF)(void*)){
-	IntList *newList = malloc(sizeof(IntList));
+GeneralList *newGeneralList(int (*comp)(void*, void*), void (*freeF)(void*)){
+	GeneralList *newList = malloc(sizeof(GeneralList));
 	if(newList == NULL){
-		perror("malloc IntList");
+		perror("malloc GeneralList");
 		return NULL;
 	}
 	newList->compFun = comp;
@@ -35,18 +35,18 @@ IntList *newIntList(int (*comp)(void*, void*), void (*freeF)(void*)){
 
 //remove first occurrence of num
 //1 elem rimosso o non presente
-_Bool intListRemove(void* elem, IntList* list){
+_Bool generalListRemove(void* elem, GeneralList* list){
 	if (list == NULL){
 		//lista non esistente
 		printf("list NULL");
 		return 0;
 	}
-	IntListNode *currPtr = list->head;
+	GeneralListNode *currPtr = list->head;
 	if (list->head == NULL){
 		return 1;
 	}
 	
-	IntListNode *precPtr = NULL;
+	GeneralListNode *precPtr = NULL;
 	if(!( list->compFun( elem, (list->head->elem) ) )){
 		//elemento rimosso dalla testa
 		list->head = list->head->nextPtr;
@@ -78,13 +78,13 @@ _Bool intListRemove(void* elem, IntList* list){
 
 //insert at the list's start
 //1 andata a buon fine   0 errore
-_Bool intListInsert(void *elem, IntList* list){
+_Bool generalListInsert(void *elem, GeneralList* list){
 	if (list == NULL){
 		printf("NULL list\n");
 		return 0;
 	}
 	
-	IntListNode* newNode = malloc(sizeof(IntListNode));
+	GeneralListNode* newNode = malloc(sizeof(GeneralListNode));
 	if(newNode == NULL){
 		perror("malloc list node");
 		return 0;
@@ -106,7 +106,7 @@ _Bool intListInsert(void *elem, IntList* list){
 	return 1;
 }
 
-void* intListPop(IntList* list){
+void* generalListPop(GeneralList* list){
 	if (list == NULL){
 		printf("lista NULL\n");
 		return NULL;
@@ -115,7 +115,7 @@ void* intListPop(IntList* list){
 		printf("lista vuota\n");
 		return NULL;
 	}
-	IntListNode* toRemove = list->head;
+	GeneralListNode* toRemove = list->head;
 	void* retVal = toRemove->elem;
 	list->head = toRemove->nextPtr;
 	free(toRemove);
@@ -126,13 +126,13 @@ void* intListPop(IntList* list){
 }
 
 //1 c'e'   0 non c'e'
-int isInIntList(void* elem, IntList* list){
+int isInGeneralList(void* elem, GeneralList* list){
 	if (list == NULL){
 		printf("list NULL\n");
 		return -1;
 	}
 	
-	IntListNode* currPtr = list->head;
+	GeneralListNode* currPtr = list->head;
 	while (currPtr != NULL && !( list->compFun(currPtr->elem, elem) ) ){
 		currPtr = currPtr->nextPtr;
 	}
@@ -140,20 +140,20 @@ int isInIntList(void* elem, IntList* list){
 }
 
 //1 = empty    0 = not empty
-int isIntListEmpty(IntList* list){
+int isGeneralListEmpty(GeneralList* list){
 	if (list == NULL){
 		return -1;
 	}
 	return list->head == NULL;
 }
 
-void intListDestroy(IntList* list){
+void generalListDestroy(GeneralList* list){
 	if (list == NULL){
 		return;
 	}
-	IntListNode* toFree = list->head;
+	GeneralListNode* toFree = list->head;
 	if (toFree != NULL){
-		IntListNode* nextFreePtr = toFree->nextPtr;
+		GeneralListNode* nextFreePtr = toFree->nextPtr;
 		while (nextFreePtr != NULL){
 			list->freeFun(toFree->elem);
 			free(toFree);

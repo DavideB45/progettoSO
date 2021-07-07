@@ -21,8 +21,8 @@ typedef struct ServerFile{
 	_Bool flagUse;
 	_Bool flagO_lock;
 	int lockOwner;// cliend ID = Inode del coso per prlarci
-	IntList* openList;// 
-	IntList* requestList;// riempita da atri thread
+	GeneralList* openList;// 
+	GeneralList* requestList;// riempita da atri thread
 	int dim;//capire quale deve essere l'unita' di misura
 	char* data;
 }ServerFile;
@@ -63,22 +63,22 @@ ServerFile* newServerFile(int creator, int O_lock){
 		return NULL;
 	}
 	
-	newFile->openList = newIntList(intCompare, free);
+	newFile->openList = newGeneralList(intCompare, free);
 	if (newFile->openList == NULL){
 		//non ho creato openList
 		pthread_mutex_destroy( &(newFile->lock) );
 		free(newFile);
 		return NULL;
 	}
-	intListInsert(creator, newFile->openList);
+	generalListInsert(creator, newFile->openList);
 	
 	//devo modificare la struttura
-	newFile->requestList = newIntList(fakeComp, free);
+	newFile->requestList = newGeneralList(fakeComp, free);
 	if(newFile->requestList == NULL){
 		//non ho creato requestList
 		pthread_mutex_destroy( &(newFile->lock) );
 		free(newFile);
-		intListDestroy(newFile->openList);
+		generalListDestroy(newFile->openList);
 		return NULL;
 	}
 	return newFile;
@@ -89,8 +89,8 @@ void destroyServerFile(ServerFile* obj){
 		return;
 	
 	pthread_mutex_destroy( &(obj->lock) );
-	intListDestroy(obj->openList);
-	intListDestroy(obj->requestList);
+	generalListDestroy(obj->openList);
+	generalListDestroy(obj->requestList);
 	free(obj->data);
 	free(obj);
 	return;
@@ -139,7 +139,7 @@ int addRequest(ServerFile *obj, Request* richiesta){
 	if(richiesta == NULL){
 		return 3;
 	}
-	if( intListInsert(richiesta ,obj->requestList ) ){
+	if( generalListInsert(richiesta ,obj->requestList ) ){
 		return 0;
 	} else {
 		return 4;
@@ -147,5 +147,5 @@ int addRequest(ServerFile *obj, Request* richiesta){
 }
 
 Request* readRequest(ServerFile *obj){
-	return ( Request* ) intListPop(obj->requestList);
+	return ( Request* ) generalListPop(obj->requestList);
 }
