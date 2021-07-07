@@ -2,8 +2,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include "files.c"
-// #include "LRU.c"
+
+#include "../../include/files.h"
+#include "../../include/tree.h"
+// #include <files.h>
+// #include <tree.h>
 #include <pthread.h>
 
 //miltiple reader
@@ -58,8 +61,9 @@ void endMutexTreeFile(TreeFile* tree){
 // return 1 se inserimento classico
 static int noMutexInsert(TreeNode* root, TreeNode* newNode){
 	//sbagliato
-
-	if( !(root->flagReal) ){
+	//correggi qui (sono tanti if)
+	//usa 2 flag tip dxOk sxOk
+	if( !(root->flagReal) && strcmp(root->name, newNode->name) && strcmp(root->name, newNode->name) ){
 		//lo metto al posto di un nodo che c'era ma non era reale
 		free(root->name);
 		root->name = newNode->name;
@@ -170,6 +174,9 @@ ServerFile* TreeFileRemove(TreeFile* tree, char* name){
 	}
 	startMutexTreeFile(tree);
 		ServerFile* toRet = noMutexRemove(tree->root, name);
+		if(toRet != NULL){
+			(tree->fileCount)--;
+		}
 	endMutexTreeFile(tree);
 	errno = 0;
 	return toRet;
@@ -202,12 +209,10 @@ static ServerFile* noMutexFind(TreeNode* root, char* name){
 //NULL = invalid argument/ not found
 static ServerFile* TreeFileFind(TreeFile* tree, char* name){
 	if(tree == NULL){
-		printf("tree Find NULL\n");
 		errno  = EFAULT;
 		return NULL;
 	}
 	if(name == NULL){
-		printf("name Find NULL\n");
 		errno  = EFAULT;
 		return NULL;
 	}
