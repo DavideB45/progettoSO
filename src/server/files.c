@@ -16,16 +16,7 @@ typedef struct Request{
 	/* elem x eseguirla */
 }Request;
 
-typedef struct ServerFile{
-	pthread_mutex_t lock;
-	_Bool flagUse;
-	_Bool flagO_lock;
-	int lockOwner;// cliend ID = Inode del coso per prlarci
-	GeneralList* openList;// 
-	GeneralList* requestList;// riempita da atri thread
-	int dim;//capire quale deve essere l'unita' di misura
-	char* data;
-}ServerFile;
+
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////// SERVER FILE ///////////////////////////////////////////
