@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
-#include "../utils/utils.c"
+#include <utils.h>
 
 typedef struct FifoNode{
 	void* data;

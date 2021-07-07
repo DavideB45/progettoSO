@@ -4,17 +4,20 @@ LIBS:= -lpthread
 
 .PHONY: all clean
 
-TARGETS:= davide.out 
+TARGETS:= davide.out server.out
+SERVEROBJS:= FifoList.o files.o server.o
 OBJS:= main.o include.o
 
 
 all: $(TARGETS)
 
+server.out : $(SERVEROBJS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 
 davide.out : $(OBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 
-%.o : src/%.c
+%.o : src/*/%.c
 	$(CC) $(CFLAGS) $< -c 
 
 clean : 
