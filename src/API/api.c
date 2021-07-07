@@ -8,8 +8,7 @@
 #include <sys/types.h>
 #include <sys/un.h>
 #include <unistd.h>
-
-
+#include <utils.h>
 
 int sock;
 //connect to the server
@@ -41,5 +40,10 @@ int openConnection(const char* sockname, int msec, const struct timespec abstime
 }
 
 int closeConnection(){
-	sock = NULL;
+	sock = 0;
+}
+
+int main(void){
+	printf("compila\n");
+	return 0;
 }

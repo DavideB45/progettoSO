@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <utils.h>
+#include <FifoList.h>
 
 typedef struct FifoNode{
 	void* data;
@@ -75,6 +76,3 @@ void* pop(FifoList* list){
 	Pthread_mutex_unlock( &(list->lock) );
 	return value;
 }
-
-
-
