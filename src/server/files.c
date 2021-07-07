@@ -85,6 +85,9 @@ ServerFile* newServerFile(int creator, int O_lock){
 }
 
 void destroyServerFile(ServerFile* obj){
+	if(obj == NULL)
+		return;
+	
 	pthread_mutex_destroy( &(obj->lock) );
 	intListDestroy(obj->openList);
 	intListDestroy(obj->requestList);
