@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include "../utils/utils.c"
 #include <stdlib.h>
+#include <errno.h>
 
 // int intCompare(void* A, void* B){
 // 	return *((int*) A) - *((int*) B);
@@ -21,5 +22,8 @@ int main(void){
 		printf("%d ", arr[i]);
 	}printf("\n");
 	
+	errno = EFAULT;
+	perror("test");
+
 	return 0;
 }

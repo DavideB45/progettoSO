@@ -9,35 +9,9 @@
 //miltiple reader
 //le modifiche dei nodi vanno fatte in mutua escluione
 
-typedef struct nodeLRU{
-	struct nodeLRU* moreRecent;
-	struct nodeLRU* lessRecent;
-	TreeNode* locate;
-
-}nodeLRU;
-
-typedef struct LRU{
-	nodeLRU* mostRecent;
-	nodeLRU* leastRecent;
-}listLRU;
 
 
-typedef struct TreeNode{
-	struct TreeNode* leftPtr;
-	struct TreeNode* rightPtr;
-	_Bool flagReal;// 0 => tutto NULL tranne elementi neccessari per funzionamento albero
-	char* name;
-	nodeLRU* useLRU;
-	ServerFile *sFile;
-}TreeNode;
 
-typedef struct TreeFile{
-	pthread_mutex_t lock;
-	pthread_cond_t waitAccess;// non sono sicuro che serva
-	int nodeCount;
-	int fileCount;
-	TreeNode* root;
-}TreeFile;
 
 //create
 // ritorna NULL in caso di errori puntatore altrimenti
@@ -83,14 +57,15 @@ void endMutexTreeFile(TreeFile* tree){
 // return 0 se gia' esiste
 // return 1 se inserimento classico
 static int noMutexInsert(TreeNode* root, TreeNode* newNode){
+	//sbagliato
 	if( !(root->flagReal) ){
 		//lo metto al posto di un nodo che c'era ma non era reale
 		free(root->name);
-		//il file deve essere NULL (fatto nella remove) 
 		root->name = newNode->name;
 		root->flagReal = 1;
+		// destroyServerFile(root->sFile);
 		root->sFile = newNode->sFile;
-		root->useLRU = newNode->useLRU;
+		// root->useLRU = newNode->useLRU;
 		free(newNode);
 		return 5;
 	}
@@ -172,6 +147,7 @@ static ServerFile* noMutexRemove(TreeNode* root, char* name){
 		ServerFile* toRet = root->sFile;
 ///////////////////////////////////////////////////////////////////////////
 		// remove(root->useLRU);
+		// root->useLRU = NULL;
 ///////////////////////////////////////////////////////////////////////////
 		root->sFile == NULL;
 		return toRet;
@@ -242,6 +218,8 @@ static ServerFile* TreeFileFind(TreeFile* tree, char* name){
 }
 
 //getNElements
+//restituisce un puntatore ad un 
+char* getNElement(char* message, int dim, const TreeFile* tree, const int N);
 
 //refactor
 
@@ -249,5 +227,33 @@ static ServerFile* TreeFileFind(TreeFile* tree, char* name){
 ////////////////////////////////// NODE /////////////////////////////////////////
 
 //create
-
+TreeNode* newTreeNode(ServerFile* sFile, char* name){
+	if(name == NULL){
+		errno = EFAULT;
+		return NULL;
+	}
+	TreeNode* newNode = malloc(sizeof(TreeNode));
+	if(newNode == NULL){
+		perror("new tree node");
+		return NULL;
+	}
+	if(sFile != NULL){
+		newNode->flagReal = 0;
+		newNode->sFile = sFile;
+	} else {
+		newNode->sFile = NULL;
+		// newNode->useLRU = NULL;
+	}
+	newNode->leftPtr = NULL;
+	newNode->rightPtr = NULL;
+	int nameL = strlen(name);
+	newNode->name = malloc(nameL + 1);
+	if(newNode->name == NULL){
+		perror("no space for name");
+		free(newNode);
+		return NULL;
+	}
+	newNode->name = strcpy(newNode->name, name);
+	return newNode;
+}
 //destroy

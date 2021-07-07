@@ -27,6 +27,7 @@ int main(void){
 	//assegno un indirizzo al socket
 	//struttura generica specializzata di volta in volta
 	struct sockaddr_un sa;
+	memset(&sa, 0, sizeof(sa));
 	//inizializzo con i valori giusti
 	strncpy(sa.sun_path, SOCKNAME,UNIX_PATH_MAX);
 	sa.sun_family=AF_UNIX;
