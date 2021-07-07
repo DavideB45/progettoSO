@@ -1,8 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
-#include "../../include/utils.h"
-#include "../../include/FifoList.h"
+#include <utils.h>
+#include <FifoList.h>
+// #include "../../include/utils.h"
+// #include "../../include/FifoList.h"
 
 
 //create an empty list

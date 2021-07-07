@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include "../utils/utils.c"
+// #include <utils.h>
 
 //connection
 #include <sys/socket.h>
@@ -11,12 +12,6 @@
 
 #define SOCKNAME "../mysock"
 #define UNIX_PATH_MAX 108
-#define SOCKET(x) x = socket(AF_UNIX, SOCK_STREAM,0);\
-						if(x==-1){ \
-							perror("create sock");\
-							exit(1);\
-						}
-
 
 int main(void){
 

@@ -1,22 +1,16 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
-#include "../utils/utils.c"
-#include "../utils/generalList.c"
-
+#include <utils.h>
+#include <errno.h>
+#include <generalList.h>
+#include <files.h>
+// #include "../../include/files.h"
 
 int fakeComp(void* a, void* b){
 	printf("stai usando una funzione non implementata\n");
 	return 0;
 }
-
-typedef struct Request{
-	int type;
-	int client;
-	/* elem x eseguirla */
-}Request;
-
-
 
 ///////////////////////////////////////////////////////////////////////////////////////////////
 /////////////////////////////////////// SERVER FILE ///////////////////////////////////////////
@@ -26,6 +20,7 @@ ServerFile* newServerFile(int creator, int O_lock){
 	if(creator < 0){
 		//errore parametri
 		printf("creator < 0\n");
+		errno = EFAULT;
 		return NULL;
 	}
 	
@@ -84,6 +79,7 @@ void destroyServerFile(ServerFile* obj){
 	generalListDestroy(obj->requestList);
 	free(obj->data);
 	free(obj);
+	obj = NULL;
 	return;
 }
 
@@ -99,13 +95,26 @@ void stopUse(ServerFile *obj){
 }
 */
 
-void  lockFile(ServerFile* obj, int locker){	
+int  lockFile(ServerFile* obj, int locker){	
+	if(obj == NULL){
+		errno = EFAULT;
+		return 0;
+	}
+	if(obj->flagO_lock == 1){
+		return 0;
+	}
+	
 	obj->flagO_lock = 1;
 	obj->lockOwner = locker;
-	return;
+	return 1;
 }
 
-_Bool unlockFile(ServerFile* obj, int locker){
+int unlockFile(ServerFile* obj, int locker){
+	if(obj == NULL){
+		errno = EFAULT;
+		return 0;
+	}
+	
 	if(locker == obj->lockOwner){
 		obj->flagO_lock = 0;
 		obj->lockOwner = locker;
@@ -125,18 +134,24 @@ void endMutex(ServerFile* obj){
 
 int addRequest(ServerFile *obj, Request* richiesta){
 	if(obj == NULL){
+		errno = EINVAL;
 		return 2;
 	}
 	if(richiesta == NULL){
+		errno = EINVAL;
 		return 3;
 	}
 	if( generalListInsert(richiesta ,obj->requestList ) ){
-		return 0;
+		return 1;
 	} else {
 		return 4;
 	}
 }
 
 Request* readRequest(ServerFile *obj){
+	if(obj == NULL){
+		errno = EFAULT;
+		return NULL;
+	}
 	return ( Request* ) generalListPop(obj->requestList);
 }

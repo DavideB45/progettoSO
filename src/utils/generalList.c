@@ -1,7 +1,10 @@
 #include <stdio.h>
+#include <errno.h>
 #include <stdlib.h>
-#include <generalList.h>
-#include "utils.c" 
+#include "../../include/generalList.h"
+#include "../../include/utils.h"
+// #include <generalList.h>
+// #include <utils.h> 
 
 
 
@@ -26,11 +29,17 @@ GeneralList *newGeneralList(int (*comp)(void*, void*), void (*freeF)(void*)){
 //remove first occurrence of num
 //1 elem rimosso o non presente
 _Bool generalListRemove(void* elem, GeneralList* list){
-	if (list == NULL){
+	if(list == NULL){
 		//lista non esistente
-		printf("list NULL");
+		errno = EFAULT;
 		return 0;
 	}
+	if(elem == NULL){
+		// elem non esistente
+		errno = EFAULT;
+		return 0;
+	}
+	
 	GeneralListNode *currPtr = list->head;
 	if (list->head == NULL){
 		return 1;
@@ -47,6 +56,7 @@ _Bool generalListRemove(void* elem, GeneralList* list){
 		free(currPtr);
 		return 1;
 	}
+
 	while(currPtr != NULL && !( list->compFun( elem, (currPtr->elem) ) )){
 		precPtr = currPtr;
 		currPtr = currPtr->nextPtr;
@@ -70,7 +80,7 @@ _Bool generalListRemove(void* elem, GeneralList* list){
 //1 andata a buon fine   0 errore
 _Bool generalListInsert(void *elem, GeneralList* list){
 	if (list == NULL){
-		printf("NULL list\n");
+		errno = EFAULT;
 		return 0;
 	}
 	
@@ -98,11 +108,10 @@ _Bool generalListInsert(void *elem, GeneralList* list){
 
 void* generalListPop(GeneralList* list){
 	if (list == NULL){
-		printf("lista NULL\n");
+		errno = EFAULT;
 		return NULL;
 	}
 	if (list->head == NULL){
-		printf("lista vuota\n");
 		return NULL;
 	}
 	GeneralListNode* toRemove = list->head;
@@ -118,8 +127,12 @@ void* generalListPop(GeneralList* list){
 //1 c'e'   0 non c'e'
 int isInGeneralList(void* elem, GeneralList* list){
 	if (list == NULL){
-		printf("list NULL\n");
-		return -1;
+		errno = EFAULT;
+		return 2;
+	}
+	if(elem == NULL){
+		errno = EFAULT;
+		return 3;
 	}
 	
 	GeneralListNode* currPtr = list->head;
