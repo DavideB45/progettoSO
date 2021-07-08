@@ -8,32 +8,27 @@
 #include "files.h"
 
 
-typedef struct nodeLRU{
-	struct nodeLRU* moreRecent;
-	struct nodeLRU* lessRecent;
-	TreeNode* locate;
-
-}nodeLRU;
-
-typedef struct LRU{
-	nodeLRU* mostRecent;
-	nodeLRU* leastRecent;
-}listLRU;
 
 typedef struct TreeNode{
 	struct TreeNode* leftPtr;
 	struct TreeNode* rightPtr;
+	struct TreeNode* moreRecentLRU;
+	struct TreeNode* lessRecentLRU;
+
 	_Bool flagReal;// 0 => tutto NULL tranne elementi neccessari per funzionamento albero
 	char* name;
-	nodeLRU* useLRU;
 	ServerFile *sFile;
 }TreeNode;
 
 typedef struct TreeFile{
 	pthread_mutex_t lock;
-	pthread_cond_t waitAccess;// non sono sicuro che serva
+
+	struct TreeNode* mostRecentLRU;
+	struct TreeNode* leastRecentLRU;
+
 	int nodeCount;
 	int fileCount;
+	int filedim;
 	TreeNode* root;
 }TreeFile;
 
@@ -46,8 +41,9 @@ typedef struct TreeFile{
 // ritorna NULL in caso di errori
 TreeFile* newTreeFile();
 
-//destroy
-
+// destroy
+// distrugge l'albero passato come argomento
+void destroyTreeFile(TreeFile* tree);
 
 // start mutex da migliorare
 void startMutexTreeFile(TreeFile* tree);

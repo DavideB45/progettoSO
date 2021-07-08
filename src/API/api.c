@@ -8,8 +8,10 @@
 #include <sys/types.h>
 #include <sys/un.h>
 #include <unistd.h>
-#include "../../include/utils.h"
-#include "../../include/api.h"
+// #include "../../include/utils.h"
+// #include "../../include/api.h"
+#include <utils.h>
+#include <api.h>
 
 int sock;
 //connect to the server

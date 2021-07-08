@@ -29,19 +29,45 @@ TreeFile* newTreeFile(){
 		free(newTree);
 		return NULL;
 	}
-	if(pthread_cond_init(&(newTree->waitAccess), NULL)){
-		pthread_mutex_destroy( &(newTree->lock) );
-		pthread_cond_destroy( &(newTree->waitAccess) );
-		free(newTree);
-		return NULL;
-	}
+	
 	newTree->fileCount = 0;
 	newTree->nodeCount = 0;
+	newTree->filedim = 0;
+
 	newTree->root = NULL;
+	newTree->leastRecentLRU = NULL;
+	newTree->mostRecentLRU = NULL;
+
 	return newTree;
 }
 
-//destroy
+
+//chiamato direttamente puo' generare errori
+static void recursiveRemove(TreeNode* root){
+	if(root == NULL){
+		return;
+	}
+	recursiveRemove(root->leftPtr);
+	recursiveRemove(root->rightPtr);
+	free(root->name);
+	destroyServerFile(root->sFile);
+	free(root);
+}
+
+//destroy stub
+void destroyTreeFile(TreeFile* tree){
+	if(tree == NULL){
+		return;
+	}
+	startMutexTreeFile(tree);
+		recursiveRemove(tree->root);
+	endMutexTreeFile(tree);
+
+	pthread_mutex_destroy( &(tree->lock) );
+	free(tree);
+	tree = NULL;
+	return;
+}
 
 //start mutex
 void startMutexTreeFile(TreeFile* tree){
@@ -49,31 +75,17 @@ void startMutexTreeFile(TreeFile* tree){
 	return;
 }
 
-//stop mutex
+// stop mutex
 void endMutexTreeFile(TreeFile* tree){
 	Pthread_mutex_unlock( &(tree->lock) );
 	return;
 }
 
-//non funziona correttamente se chiamata direttamente
+// non funziona correttamente se chiamata direttamente
 // return 5 se ho sostituito
 // return 0 se gia' esiste
 // return 1 se inserimento classico
 static int noMutexInsert(TreeNode* root, TreeNode* newNode){
-	//sbagliato
-	//correggi qui (sono tanti if)
-	//usa 2 flag tip dxOk sxOk
-	if( !(root->flagReal) && strcmp(root->name, newNode->name) && strcmp(root->name, newNode->name) ){
-		//lo metto al posto di un nodo che c'era ma non era reale
-		free(root->name);
-		root->name = newNode->name;
-		root->flagReal = 1;
-		// destroyServerFile(root->sFile);
-		root->sFile = newNode->sFile;
-		// root->useLRU = newNode->useLRU;
-		free(newNode);
-		return 5;
-	}
 	
 	int compare = strcmp(root->name, newNode->name);
 	if(compare < 0){
@@ -90,7 +102,17 @@ static int noMutexInsert(TreeNode* root, TreeNode* newNode){
 		}
 		return noMutexInsert(root->leftPtr, newNode);
 	}
-	return 0;//elemento gia' presente
+	if(root->flagReal == 0){
+		destroyServerFile(root->sFile);///////////////////potrebbe causare problemi?//////////
+		root->sFile = newNode->sFile;
+		root->flagReal = 1;
+		free(newNode->name);
+		free(newNode);
+		newNode = root;
+		return 5;
+	} else {
+		return 0;//elemento gia' presente
+	}
 }
 
 //insert stub non garantice che il puntatore al nodo sia lo stesso
@@ -112,18 +134,32 @@ int TreeFileinsert(TreeFile* tree , TreeNode* newNode){
 	startMutexTreeFile(tree);
 		if(tree->root == NULL){
 			tree->root = newNode;
+			if(newNode->sFile != NULL){
+				tree->filedim = newNode->sFile->dim;
+				(tree->fileCount)++;
+///////////insertToFrontLRU(tree, newNode)//////////////////////////////////////////////////////
+			}
+			(tree->nodeCount)++;
+			//per LRU e' sia primo che ultimo
 			endMutexTreeFile(tree);
 			return 1;
 		}
 
 		int ret = noMutexInsert(tree->root, newNode);
 		if (ret != 4){
-			(tree->fileCount)++;
+			if(newNode->sFile != NULL){
+				(tree->fileCount)++;
+				(tree->filedim) += newNode->sFile->dim;
+///////////insertToFrontLRU(tree, newNode)////////////////////////////////////////////////////////////
+			}
+			
 			if(ret == 1){
 				(tree->nodeCount)++;
 			} else {
 				ret = 1;
 			}
+		} else {
+			ret = 0;
 		}
 		
 	endMutexTreeFile(tree);
@@ -133,35 +169,23 @@ int TreeFileinsert(TreeFile* tree , TreeNode* newNode){
 
 
 //non funziona correttamente se chiamata direttamente
-static ServerFile* noMutexRemove(TreeNode* root, char* name){
+static TreeNode* noMutexGetNode(TreeNode* root, char* name){
 	if(root == NULL){
 		return NULL;
 	}
 	int compare = strcmp(root->name, name);
 	if(compare < 0){
-		return noMutexRemove(root->rightPtr, name);
+		return noMutexGetNode(root->rightPtr, name);
 	}
 	if(compare > 0){
-		return noMutexInsert(root->leftPtr, name);
+		return noMutexGetNode(root->leftPtr, name);
 	}
-
-	if(root->flagReal == 0){
-		return NULL;
-	} else {
-		root->flagReal = 0;
-		ServerFile* toRet = root->sFile;
-///////////////////////////////////////////////////////////////////////////
-		// remove(root->useLRU);
-		// root->useLRU = NULL;
-///////////////////////////////////////////////////////////////////////////
-		root->sFile == NULL;
-		return toRet;
-	}
+	return root;
 }
 
 //remove stub
 //NULL -> non trovato/bad address
-ServerFile* TreeFileRemove(TreeFile* tree, char* name){
+ServerFile* TreeFileRemove(TreeFile* tree, char* name){//////////continua da qui////////////////////////////////////////////////////////////////
 	if(tree == NULL){
 		printf("tree remove NULL\n");
 		errno  = EFAULT;
@@ -173,10 +197,16 @@ ServerFile* TreeFileRemove(TreeFile* tree, char* name){
 		return NULL;
 	}
 	startMutexTreeFile(tree);
-		ServerFile* toRet = noMutexRemove(tree->root, name);
+
+		TreeNode* node = noMutexGetNode(tree->root, name);
+		ServerFile* toRet = node->sFile;
 		if(toRet != NULL){
 			(tree->fileCount)--;
+			(tree->filedim) -= toRet->dim;
+/////////removeFromLRU(tree, node)/////////////////////////////////////////////////////////////////////
 		}
+		node->flagReal = 0;
+		node->sFile = NULL;
 	endMutexTreeFile(tree);
 	errno = 0;
 	return toRet;
@@ -189,10 +219,10 @@ static ServerFile* noMutexFind(TreeNode* root, char* name){
 	}
 	int compare = strcmp(root->name, name);
 	if(compare < 0){
-		return noMutexRemove(root->rightPtr, name);
+		return noMutexFind(root->rightPtr, name);
 	}
 	if(compare > 0){
-		return noMutexInsert(root->leftPtr, name);
+		return noMutexFind(root->leftPtr, name);
 	}
 
 	if(root->flagReal == 0){
@@ -263,3 +293,7 @@ TreeNode* newTreeNode(ServerFile* sFile, char* name){
 	return newNode;
 }
 //destroy
+
+
+/////////////////////////////////// LRU /////////////////////////////////////////
+///////////////////////////////// REPLACE ///////////////////////////////////////
