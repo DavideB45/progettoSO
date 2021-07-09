@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <generalList.h>
+#include <request.h>
 
 typedef struct ServerFile{
 	pthread_mutex_t lock;
@@ -18,11 +19,6 @@ typedef struct ServerFile{
 	char* data;
 }ServerFile;
 
-typedef struct Request{
-	int type;
-	int client;
-	/* elem x eseguirla */
-}Request;
 
 // funzione che ritorna 0;
 int fakeComp(void* a, void* b);

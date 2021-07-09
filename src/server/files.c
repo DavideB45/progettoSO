@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <generalList.h>
 #include <files.h>
+#include <request.h>
 // #include "../../include/files.h"
 
 int fakeComp(void* a, void* b){
