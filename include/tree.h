@@ -72,15 +72,32 @@ char* getNElement(char* message, int dim, const TreeFile* tree, const int N);
 
 //refactor
 
+
 ////////////////////////////////// TREE /////////////////////////////////////////
 ////////////////////////////////// NODE /////////////////////////////////////////
+
 
 // crea un nuovo nodo dell'albero
 // ritorna NULL in caso di errori
 // se sFile non e' nullo e' incluso nella creazione
 TreeNode* newTreeNode(ServerFile* sFile, char* name);
 
-//destroy
-void destroyTreeNode(TreeFile tree ,TreeNode node);
+// destroy
+// libera la memoria occupata da node
+// libera eventuale memoria del contenuto
+void destroyTreeNode(TreeNode* node);
+
+
+/////////////////////////////////// LRU /////////////////////////////////////////
+///////////////////////////////// REPLACE ///////////////////////////////////////
+
+
+int moveToFrontLRU(TreeFile* tree, TreeNode* node);
+
+int removeFromLRU(TreeFile* tree, TreeNode* node);
+
+int insertToFrontLRU(TreeFile* tree, TreeNode* node);
+
+int makeSpace();
 
 #endif

@@ -14,7 +14,8 @@
 
 
 
-
+////////////////////////////////// TREE /////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////////
 
 //create
 // ritorna NULL in caso di errori puntatore altrimenti
@@ -249,7 +250,7 @@ static ServerFile* TreeFileFind(TreeFile* tree, char* name){
 		ServerFile* toRet = NULL;
 		if(node != NULL){
 			if(node->flagReal == 1){
-//-/-/-/-/-/-/-/moveToFront(tree, node);/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-
+//-/-/-/-/-/-/-/moveToFrontLRU(tree, node);/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-/-
 				toRet = node->sFile;
 			}
 		}
@@ -300,8 +301,13 @@ TreeNode* newTreeNode(ServerFile* sFile, char* name){
 }
 
 //destroy
-void destroyTreeNode(TreeFile tree ,TreeNode node){
-		
+void destroyTreeNode(TreeNode* node){
+		if(node == NULL){
+			return;
+		}
+
+		free(node->name);
+		destroyServerFile(node->sFile);
 }
 
 /////////////////////////////////// LRU /////////////////////////////////////////
