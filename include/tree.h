@@ -81,6 +81,6 @@ char* getNElement(char* message, int dim, const TreeFile* tree, const int N);
 TreeNode* newTreeNode(ServerFile* sFile, char* name);
 
 //destroy
-
+void destroyTreeNode(TreeFile tree ,TreeNode node);
 
 #endif
