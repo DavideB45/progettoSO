@@ -1,3 +1,9 @@
+#ifndef REQUEST_H
+#define REQUEST_H
+
+#pragma once
+
+
 typedef struct Request{
 	int type;
 	int client;
@@ -15,3 +21,5 @@ typedef struct Request{
 Request* newRequest(int type, int client, char* sFilename, char* forEdit, int O_lock, int sendDeleted);
 
 void destroyRequest(Request req);
+
+#endif

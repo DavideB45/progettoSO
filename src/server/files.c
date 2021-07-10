@@ -57,12 +57,21 @@ ServerFile* newServerFile(int creator, int O_lock){
 		free(newFile);
 		return NULL;
 	}
-	generalListInsert(creator, newFile->openList);
+	int* newOpen = malloc(sizeof(int));
+	if(newOpen == NULL){
+		generalListDestroy(newFile->openList);
+		pthread_mutex_destroy( &(newFile->lock) );
+		free(newFile);
+		return NULL;
+	}
+	
+	generalListInsert( (void*) newOpen, newFile->openList);
 	
 	//devo modificare la struttura
 	newFile->requestList = newGeneralList(fakeComp, free);
 	if(newFile->requestList == NULL){
 		//non ho creato requestList
+		free(newOpen);
 		pthread_mutex_destroy( &(newFile->lock) );
 		free(newFile);
 		generalListDestroy(newFile->openList);
@@ -102,7 +111,7 @@ int  lockFile(ServerFile* obj, int locker){
 		return 0;
 	}
 	if(obj->flagO_lock == 1){
-		return 0;
+		return obj->lockOwner == locker;
 	}
 	
 	obj->flagO_lock = 1;
