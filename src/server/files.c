@@ -8,7 +8,7 @@
 #include <request.h>
 // #include "../../include/files.h"
 
-int fakeComp(void* a, void* b){
+int fakeComp(const void* a,const void* b){
 	printf("stai usando una funzione non implementata\n");
 	return 0;
 }
@@ -50,7 +50,7 @@ ServerFile* newServerFile(int creator, int O_lock){
 		return NULL;
 	}
 	
-	newFile->openList = newGeneralList(intCompare, free);
+	newFile->openList = newGeneralList( intCompare, free);
 	if (newFile->openList == NULL){
 		//non ho creato openList
 		pthread_mutex_destroy( &(newFile->lock) );

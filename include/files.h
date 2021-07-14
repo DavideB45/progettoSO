@@ -21,7 +21,7 @@ typedef struct ServerFile{
 
 
 // funzione che ritorna 0;
-int fakeComp(void* a, void* b);
+int fakeComp(const void* a,const void* b);
 
 //crea un nuovo file per il server
 //ritorna NULL se fallisce

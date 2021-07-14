@@ -11,14 +11,14 @@ typedef struct GeneralListNode{
 typedef struct GeneralList{
 	GeneralListNode *head;
 	GeneralListNode *queue;
-	int (*compFun)(void*, void*);
+	int (*compFun)(const void*,const void*);
 	void (*freeFun)(void*);
 }GeneralList;
 
 
 // crea una lista usando i parametri in ingresso
 // ritorna NULL in caso di fallimento
-GeneralList *newGeneralList(int (*comp)(void*, void*), void (*freeF)(void*));
+GeneralList *newGeneralList(int (*comp)(const void*,const void*), void (*freeF)(void*));
 
 // remove first occurrence of num
 // 1 elem rimosso o non presente

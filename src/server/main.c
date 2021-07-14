@@ -3,7 +3,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <utils.h>
-
+#include <pthread.h>
 #include <files.h>
 #include <request.h>
 
@@ -21,16 +21,23 @@ int main(void){
 	}
 	printf("\n");
 
+	// pthread_mutex_t* mute = malloc(sizeof(pthread_mutex_t));
+	// Pthread_mutex_init(mute);
+	// Pthread_mutex_lock(mute);
+	// Pthread_mutex_lock(mute);
+	// Pthread_mutex_lock(mute);
+	// free(mute);
+
 	// int arr[10] = {12, 23, 3, 19, 19, 10, 0, 6, 54, 8};
 	// qsort(arr, 10, sizeof(int), intCompare);
 	// for (size_t i = 0; i < 10; i++){
 	// 	printf("%d ", (int) arr[i]);
 	// }printf("\n");
 	
-	errno = EFAULT;
-	perror("test");
+	// errno = EFAULT;
+	// perror("test");
 
-	printf("\nresult: %s\n",testFile());
+	// printf("\nresult: %s\n",testFile());
 
 	return 0;
 }

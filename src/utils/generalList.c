@@ -1,10 +1,10 @@
 #include <stdio.h>
 #include <errno.h>
 #include <stdlib.h>
-#include "../../include/generalList.h"
-#include "../../include/utils.h"
-// #include <generalList.h>
-// #include <utils.h> 
+// #include "../../include/generalList.h"
+// #include "../../include/utils.h"
+#include <generalList.h>
+#include <utils.h> 
 
 
 
@@ -13,7 +13,7 @@
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
 //crea una bella lista
-GeneralList *newGeneralList(int (*comp)(void*, void*), void (*freeF)(void*)){
+GeneralList *newGeneralList(int (*comp)(const void*,const void*), void (*freeF)(void*)){
 	GeneralList *newList = malloc(sizeof(GeneralList));
 	if(newList == NULL){
 		perror("malloc GeneralList");

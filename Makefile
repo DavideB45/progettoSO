@@ -5,10 +5,10 @@ LIBS:= -lpthread
 .PHONY: all clean
 
 TARGETS:= server.out api.out test.out
-SERVEROBJS:= FifoList.o files.o server.o 
+SERVEROBJS:= FifoList.o files.o server.o generalList.o utils.o main.o
 APIOBJ:= api.o utils.o
 OBJS:= main.o
-MAINOBJS:= files.o utils.o
+MAINOBJS:= files.o utils.o generalList.o main.o
 
 
 all: $(TARGETS)
@@ -17,6 +17,8 @@ all: $(TARGETS)
 
 test.out : $(MAINOBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
+	mv *.out ./bin
+	mv *.o ./bin
 
 server.out : $(SERVEROBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
