@@ -45,15 +45,17 @@ TreeFile* newTreeFile();
 // distrugge l'albero passato come argomento
 void destroyTreeFile(TreeFile* tree);
 
-// start mutex da migliorare
-void startMutexTreeFile(TreeFile* tree);
+// start mutex 
+// retun 0 on success else -1
+int startMutexTreeFile(TreeFile* tree);
 
-// stop mutex da migliorare
-void endMutexTreeFile(TreeFile* tree);
+// stop mutex
+// retun 0 on success else -1
+int endMutexTreeFile(TreeFile* tree);
 
 // inserisce il nuovo nodo nell'albero
 // inserzione riuscita = 1   alreadyExist = 0
-// errori Node = 2   nullTree = 3   
+// errori Node = 2   nullTree = 3   noLock = 4
 // insert non garantice che il puntatore al nodo sia lo stesso
 int TreeFileinsert(TreeFile* tree , TreeNode* newNode);
 

@@ -19,13 +19,19 @@ typedef struct FifoList{
 	FifoNode* queuePtr;
 }FifoList;
 
-//create an empty list
+// create an empty list
 FifoList* newList();
-//return 1 if empty 0 if not empty
-_Bool isEmpty(FifoList* list);
-//insert in queue
+
+// return 1 if empty 0 if not empty
+// -1 err
+int isEmpty(FifoList* list);
+
+// insert in queue
+// ret -> 0 failure 1 success
 _Bool insert(FifoList* list, void* elem);
-//remove first element and return its data pointer
+
+// remove first element and return its data pointer
+// if an error occurrs return NULL
 void* pop(FifoList* list);
 
 #endif

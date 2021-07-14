@@ -44,8 +44,7 @@ ServerFile* newServerFile(int creator, int O_lock){
 		newFile->flagO_lock = 0;
 	}
 	
-	if(pthread_mutex_init( &(newFile->lock), NULL )){
-		pthread_mutex_destroy( &(newFile->lock) );
+	if( Pthread_mutex_init( &(newFile->lock) ) != 0){
 		free(newFile);
 		return NULL;
 	}
@@ -134,12 +133,18 @@ int unlockFile(ServerFile* obj, int locker){
 	}
 }
 
-void startMutex(ServerFile* obj){
-	Pthread_mutex_lock( &(obj->lock) );
+int startMutex(ServerFile* obj){
+	if(obj == NULL){
+		return -1;
+	}
+	return Pthread_mutex_lock( &(obj->lock) );
 }
 
-void endMutex(ServerFile* obj){
-	Pthread_mutex_unlock( &(obj->lock) );
+int endMutex(ServerFile* obj){
+	if(obj == NULL){
+		return -1;
+	}
+	return Pthread_mutex_unlock( &(obj->lock) );
 }
 
 int addRequest(ServerFile *obj, Request* richiesta){

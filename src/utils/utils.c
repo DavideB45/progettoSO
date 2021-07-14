@@ -29,6 +29,10 @@ int Pthread_mutex_init(pthread_mutex_t *mutex){
 
 /*retun 0 on success else -1*/
 int Pthread_mutex_lock(pthread_mutex_t *mutex){
+	if(mutex == NULL){
+		return -1;
+	}
+	
 	int ret = pthread_mutex_lock(mutex);
 	switch(ret){
 	case EINVAL:
@@ -52,11 +56,30 @@ int Pthread_mutex_lock(pthread_mutex_t *mutex){
 		}
 	}
 }
+
 /*retun 0 on success else -1*/
 int Pthread_mutex_unlock(pthread_mutex_t *mutex){
-	if(pthread_mutex_unlock(mutex) != 0){
-		perror("unlock");
-		exit(1);
+	if(mutex == NULL){
+		return -1;
 	}
-	return 0;
+	
+	int ret = pthread_mutex_unlock(mutex);
+	
+
+	if(ret == EINVAL){
+		if( Pthread_mutex_init(mutex) != 0){
+			return -1;
+		}
+		ret = pthread_mutex_unlock(mutex);	
+	}
+	
+	if(ret == 0){
+		return 0;
+	}
+
+	if(ret == EPERM){
+		return -1;
+	} else {
+		exit(-1);
+	}
 }

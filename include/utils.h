@@ -10,8 +10,14 @@
 						}
 
 int intCompare(const void* A,const void* B);
+
+/*retun 0 on success else -1*/
 int Pthread_mutex_init(pthread_mutex_t *mutex);
+
+/*retun 0 on success else -1*/
 int Pthread_mutex_lock(pthread_mutex_t *mutex);
+
+/*retun 0 on success else -1*/
 int Pthread_mutex_unlock(pthread_mutex_t *mutex);
 
 #endif

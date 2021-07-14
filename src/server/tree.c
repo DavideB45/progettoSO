@@ -3,10 +3,10 @@
 #include <string.h>
 #include <errno.h>
 
-#include "../../include/files.h"
-#include "../../include/tree.h"
-// #include <files.h>
-// #include <tree.h>
+// #include "../../include/files.h"
+// #include "../../include/tree.h"
+#include <files.h>
+#include <tree.h>
 #include <pthread.h>
 
 //miltiple reader
@@ -17,7 +17,7 @@
 ////////////////////////////////// TREE /////////////////////////////////////////
 /////////////////////////////////////////////////////////////////////////////////
 
-//create
+// create
 // ritorna NULL in caso di errori puntatore altrimenti
 TreeFile* newTreeFile(){
 	TreeFile* newTree = malloc(sizeof(TreeFile));
@@ -25,8 +25,7 @@ TreeFile* newTreeFile(){
 		perror("malloc newTree");
 		return NULL;
 	}
-	if(pthread_mutex_init( &(newTree->lock), NULL )){
-		pthread_mutex_destroy( &(newTree->lock) );
+	if( Pthread_mutex_init( &(newTree->lock)) != 0){
 		free(newTree);
 		return NULL;
 	}
@@ -43,16 +42,16 @@ TreeFile* newTreeFile(){
 }
 
 
-//chiamato direttamente puo' generare errori
+// chiamato direttamente puo' generare errori
+// usato  per distruggere l'albero
 static void recursiveRemove(TreeNode* root){
 	if(root == NULL){
 		return;
 	}
 	recursiveRemove(root->leftPtr);
 	recursiveRemove(root->rightPtr);
-	free(root->name);
-	destroyServerFile(root->sFile);
-	free(root);
+	destroyTreeNode(root);
+	return;
 }
 
 //destroy stub
@@ -71,15 +70,21 @@ void destroyTreeFile(TreeFile* tree){
 }
 
 //start mutex
-void startMutexTreeFile(TreeFile* tree){
-	Pthread_mutex_lock( &(tree->lock) );
-	return;
+/*retun 0 on success else -1*/
+int startMutexTreeFile(TreeFile* tree){
+	if(tree == NULL){
+		return -1;
+	}
+	return Pthread_mutex_lock( &(tree->lock) );
 }
 
 // stop mutex
-void endMutexTreeFile(TreeFile* tree){
-	Pthread_mutex_unlock( &(tree->lock) );
-	return;
+/*retun 0 on success else -1*/
+int endMutexTreeFile(TreeFile* tree){
+	if(tree == NULL){
+		return -1;
+	}
+	return Pthread_mutex_unlock( &(tree->lock) );
 }
 
 // non funziona correttamente se chiamata direttamente
@@ -118,7 +123,7 @@ static int noMutexInsert(TreeNode* root, TreeNode* newNode){
 
 //insert stub non garantice che il puntatore al nodo sia lo stesso
 // inserzione riuscita = 1
-//errori Node = 2   nullTree = 3   alreadyExist = 0
+//errori Node = 2   nullTree = 3   alreadyExist = 0   noLock = 4
 int TreeFileinsert(TreeFile* tree , TreeNode* newNode){
 	if(newNode == NULL){
 		errno = EFAULT;
@@ -132,7 +137,9 @@ int TreeFileinsert(TreeFile* tree , TreeNode* newNode){
 		errno = EFAULT;
 		return 3;
 	}
-	startMutexTreeFile(tree);
+	if( startMutexTreeFile(tree) != 0){
+		return 4;
+	}
 		if(tree->root == NULL){
 			tree->root = newNode;
 			if(newNode->sFile != NULL){
@@ -186,7 +193,7 @@ static TreeNode* noMutexGetNode(TreeNode* root, char* name){
 }
 
 //remove stub
-//NULL -> non trovato/bad address
+//NULL -> non trovato/bad address/no Lock
 ServerFile* TreeFileRemove(TreeFile* tree, char* name){
 	if(tree == NULL){
 		printf("tree remove NULL\n");
@@ -198,7 +205,10 @@ ServerFile* TreeFileRemove(TreeFile* tree, char* name){
 		errno  = EFAULT;
 		return NULL;
 	}
-	startMutexTreeFile(tree);
+	if( startMutexTreeFile(tree) != 0){
+		errno = EPERM;
+		return NULL;
+	}
 
 		TreeNode* node = noMutexGetNode(tree->root, name);
 		ServerFile* toRet = node->sFile;
@@ -235,7 +245,7 @@ ServerFile* TreeFileRemove(TreeFile* tree, char* name){
 
 //find stub
 //NULL = invalid argument/ not found
-static ServerFile* TreeFileFind(TreeFile* tree, char* name){
+ServerFile* TreeFileFind(TreeFile* tree, char* name){
 	if(tree == NULL){
 		errno  = EFAULT;
 		return NULL;
@@ -244,7 +254,10 @@ static ServerFile* TreeFileFind(TreeFile* tree, char* name){
 		errno  = EFAULT;
 		return NULL;
 	}
-	startMutexTreeFile(tree);
+	if( startMutexTreeFile(tree) != 0){
+		errno = EPERM;
+		return NULL;
+	}
 		TreeNode* node = noMutexGetNode(tree->root, name);
 
 		ServerFile* toRet = NULL;
@@ -308,6 +321,9 @@ void destroyTreeNode(TreeNode* node){
 
 		free(node->name);
 		destroyServerFile(node->sFile);
+		free(node);
+		node = NULL;
+		return;
 }
 
 /////////////////////////////////// LRU /////////////////////////////////////////

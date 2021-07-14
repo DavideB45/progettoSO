@@ -23,7 +23,7 @@ int main(void){
 
 	// pthread_mutex_t* mute = malloc(sizeof(pthread_mutex_t));
 	// Pthread_mutex_init(mute);
-	// Pthread_mutex_lock(mute);
+	Pthread_mutex_lock(NULL);
 	// Pthread_mutex_lock(mute);
 	// Pthread_mutex_lock(mute);
 	// free(mute);
