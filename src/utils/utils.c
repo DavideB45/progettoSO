@@ -1,12 +1,13 @@
 /*
 	funzioni readn e writen
-	copiate dalla soluzione
+	riprese dalla soluzione
 	di un' esercitazione
 */
 #include <stdio.h>
 #include <stdlib.h>
 #include <pthread.h>
 #include <errno.h>
+#include <unistd.h>
 
 int intCompare(const void* A,const void* B){
 	return *((int*) A) - *((int*) B);
@@ -18,12 +19,12 @@ int intCompare(const void* A,const void* B){
  *   \retval  0   se durante la lettura da fd leggo EOF
  *   \retval  1 se termina con successo
  */
-static inline int readn(long fd, void *buf, size_t size) {
+int readn(long fd, void *buf, size_t size) {
     size_t left = size;
     int r;
     char *bufptr = (char*)buf;
     while(left>0) {
-		if ((r=read((int)fd ,bufptr,left)) == -1) {
+		if ((r= read((int)fd ,bufptr,left)) == -1) {
 			if (errno == EINTR) 
 				continue;
 			return -1;
@@ -43,13 +44,13 @@ static inline int readn(long fd, void *buf, size_t size) {
  *   \retval  0   se durante la scrittura la write ritorna 0
  *   \retval  1   se la scrittura termina con successo
  */
-static inline int writen(long fd, void *buf, size_t size) {
+int writen(long fd, void *buf, size_t size) {
     size_t left = size;
     int r;
     char *bufptr = (char*)buf;
     while(left>0) {
 		if ((r=write((int)fd ,bufptr,left)) == -1) {
-			if (errno == EINTR) 
+			if (errno == EINTR)
 				continue;
 			return -1;
 		}

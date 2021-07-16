@@ -3,6 +3,7 @@
 
 #pragma once
 
+
 #define SOCKET(x) x = socket(AF_UNIX, SOCK_STREAM,0);\
 						if(x==-1){ \
 							perror("create sock");\
@@ -11,7 +12,7 @@
 
 /*
 	funzioni readn e writen
-	copiate dalla soluzione
+	riprese dalla soluzione
 	di un' esercitazione
 */
 
@@ -19,13 +20,13 @@
 // -1   errore (errno settato)
 //  0   se durante la lettura da fd leggo EOF
 //  1   se termina con successo
-static inline int readn(long fd, void *buf, size_t size);
+int readn(long fd, void *buf, size_t size);
 
 // Evita scritture parziali
 // -1   errore (errno settato)
 //  0   se durante la scrittura la write ritorna 0
 //  1   se la scrittura termina con successo
-static inline int writen(long fd, void *buf, size_t size);
+int writen(long fd, void *buf, size_t size);
 
 
 

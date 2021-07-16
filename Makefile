@@ -8,7 +8,7 @@ TARGETS:= server.out api.out test.out
 SERVEROBJS:= FifoList.o files.o server.o generalList.o utils.o main.o
 APIOBJ:= api.o utils.o
 OBJS:= main.o
-MAINOBJS:= files.o utils.o generalList.o main.o
+MAINOBJS:= utils.o generalList.o main.o
 
 
 all: $(TARGETS)
