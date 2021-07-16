@@ -9,6 +9,26 @@
 							exit(1);\
 						}
 
+/*
+	funzioni readn e writen
+	copiate dalla soluzione
+	di un' esercitazione
+*/
+
+// Evita letture parziali
+// -1   errore (errno settato)
+//  0   se durante la lettura da fd leggo EOF
+//  1   se termina con successo
+static inline int readn(long fd, void *buf, size_t size);
+
+// Evita scritture parziali
+// -1   errore (errno settato)
+//  0   se durante la scrittura la write ritorna 0
+//  1   se la scrittura termina con successo
+static inline int writen(long fd, void *buf, size_t size);
+
+
+
 int intCompare(const void* A,const void* B);
 
 /*retun 0 on success else -1*/
