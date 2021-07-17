@@ -1,9 +1,19 @@
-_n_worker  ==   12   
+//	non e' consentito lasciare campi vuoti
+//  per usare valori default usare 0
+
+//  bisogna distaccare con almeno un carattere
+//  i valori dal nome con un simbolo a scelta tra : 
+//  " ", "\t", ":", "=" o una sequenza di questi
+
+//  non e' consentito modificare i nomi
+//  ne il loro ordinamento
+
+_n_worker  ==2   
 
 
 
-_max_file 			  :::= 130              
+_max_file:::= 13              
 
 
-_max_dim := 30      _socket_name=  beppe
+_max_dim := 300      _socket_name=  0
 _file_log_name	looog

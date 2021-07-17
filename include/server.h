@@ -23,7 +23,10 @@
 
 typedef struct ServerInfo{
 	char* sockName;
+	char* logName;
 	int sockFD;
+	int maxFileNum;
+	int maxFileDim;
 	int doneReq[2];
 	FifoList* toServe;
 	int serverStatus;

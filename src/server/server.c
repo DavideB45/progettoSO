@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <string.h>
 
 // selfmade
 #include <utils.h>
@@ -19,7 +20,7 @@
 
 ServerInfo srvGen;
 
-int readFileConfig(char*);
+void readConfig(char* indirizzo);
 int initServer(void);
 
 void dispatcher(void);
@@ -34,9 +35,6 @@ int main(int argc, char* argv[]){
 	
 
 }
-
-
-int readFileConfig(char*);
 
 int initServer(void){
 	
@@ -196,6 +194,72 @@ void dispatcher(void){
 }
 
 
+void readConfig(char* indirizzo){
+	
+	char* sockName = "default";
+	char* logFile = "loggo";
+	int maxFileNum = 0;
+	int maxFileDim = 0;
+	int nWorker    = 0;
+
+	FILE * filePtr = NULL;
+	filePtr = fopen(indirizzo, "r");
+	if(filePtr == NULL){
+		printf("fileNotFound\n");
+		return;
+	}
+	int num;
+	char str[20];
+
+	fscanf(filePtr, "%*[^_]");
+
+	fscanf(filePtr, "%*[_n_worker]%*[ :=\t]%d%*[ \n]", &num);
+	if(num > 0){
+		nWorker = num;		
+	}
+	printf("worker : %d\n", nWorker);
+
+	fscanf(filePtr, "%*[_max_file]%*[ :=\t]%d\n", &num);
+	if(num > 0){
+		maxFileNum = num;
+	}
+	printf("maxFil : %d\n", maxFileNum);
+
+	fscanf(filePtr, "%*[_max_dim]%*[ :=\t]%d%*[\n MbBm]", &num);
+	if(num > 0){
+		maxFileDim = num;
+	}
+	printf("maxDim : %d\n", maxFileDim);
+
+	fscanf(filePtr, "%*[_socket_name]%*[ :=\t]%s\n", str);
+	if(strlen(str) == 1 && str[0] == '0'){
+		srvGen.sockName = malloc(7);
+		if(srvGen.sockName == NULL)
+			exit(1);
+		strcpy(srvGen.sockName, "socket");
+	} else {
+		srvGen.sockName = malloc( strlen(str) + 1 );
+		if(srvGen.sockName == NULL)
+			exit(1);
+		strcpy(srvGen.sockName, str);	
+	}
+	printf("nameSo : %s\n", str);
+
+	fscanf(filePtr, "%*[_file_log_name]%*[ :=\t]%s\n", str);
+	if(strlen(str) == 1 && str[0] == '0'){
+		srvGen.logName = malloc(4);
+		if(srvGen.logName == NULL)
+			exit(1);
+		strcpy(srvGen.logName, "log");
+	} else {
+		srvGen.logName = malloc( strlen(str) + 1 );
+		if(srvGen.logName == NULL)
+			exit(1);
+		strcpy(srvGen.logName, str);	
+	}
+	printf("nameLo : %s\n", str);
+}
+
 int updatemax(fd_set set, int maxFD){
 	for(int i = (maxFD - 1); i>=0 ; --i ){
 		if(FD_ISSET(i, &set)) 
@@ -203,3 +267,4 @@ int updatemax(fd_set set, int maxFD){
 	}
 	return -1;
 }
+

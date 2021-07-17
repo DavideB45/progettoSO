@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <unistd.h>
-
+#include <string.h>
 
 #include <pthread.h>
 
@@ -94,10 +94,11 @@ int main(void){
 
 void read_config(char* indirizzo){
 	
-	// char* sockName = "default";
-	// int maxFileNum = 0;
-	// int maxFileDim = 0;
-	// int nWorker    = 0;
+	char* sockName = NULL;
+	char* logFile = NULL;
+	int maxFileNum = 0;
+	int maxFileDim = 0;
+	int nWorker    = 0;
 
 	FILE * filePtr = NULL;
 	filePtr = fopen(indirizzo, "r");
@@ -107,14 +108,53 @@ void read_config(char* indirizzo){
 	}
 	int num;
 	char str[20];
+
+	fscanf(filePtr, "%*[^_]");
+
 	fscanf(filePtr, "%*[_n_worker]%*[ :=\t]%d%*[ \n]", &num);
-	printf("worker : %d\n", num);
+	if(num > 0){
+		nWorker = num;		
+	}
+	printf("worker : %d\n", nWorker);
+
 	fscanf(filePtr, "%*[_max_file]%*[ :=\t]%d\n", &num);
-	printf("maxFil : %d\n", num);
+	if(num > 0){
+		maxFileNum = num;
+	}
+	printf("maxFil : %d\n", maxFileNum);
+
 	fscanf(filePtr, "%*[_max_dim]%*[ :=\t]%d%*[\n MbBm]", &num);
-	printf("maxDim : %d\n", num);
+	if(num > 0){
+		maxFileDim = num;
+	}
+	printf("maxDim : %d\n", maxFileDim);
+
 	fscanf(filePtr, "%*[_socket_name]%*[ :=\t]%s\n", str);
+	printf("%d %c\n", strlen(str), str[0]);
+	if(strlen(str) == 1 && str[0] == '0'){
+		sockName = malloc(7);
+		if(sockName == NULL)
+			exit(1);
+		strcpy(sockName, "socket");
+	} else {
+		sockName = malloc( strlen(str) + 1 );
+		if(sockName == NULL)
+			exit(1);
+		strcpy(sockName, str);	
+	}
 	printf("nameSo : %s\n", str);
+
 	fscanf(filePtr, "%*[_file_log_name]%*[ :=\t]%s\n", str);
+	if(strlen(str) == 1 && str[0] == '0'){
+		logFile = malloc(4);
+		if(logFile == NULL)
+			exit(1);
+		strcpy(logFile, "log");
+	} else {
+		logFile = malloc( strlen(str) + 1 );
+		if(logFile == NULL)
+			exit(1);
+		strcpy(logFile, str);	
+	}
 	printf("nameLo : %s\n", str);
 }
