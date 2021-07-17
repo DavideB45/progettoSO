@@ -148,7 +148,9 @@ void dispatcher(void){
 							break;
 							case  0:
 								// pipe chiusa (non la guardo piu')
-								close(srvGen.doneReq[0]);
+								if(close(srvGen.doneReq[0]) != 0){
+									perror("close pipe (select)");
+								}
 								FD_CLR(fd, &set);
 							break;
 							case 1:
@@ -160,7 +162,9 @@ void dispatcher(void){
 								} else {
 									// chiudo il socket
 									FD_CLR(GET_FD(resetConn), &set);
-									close(GET_FD(resetConn));
+									if(close(GET_FD(resetConn))){
+										perror("close client");
+									}
 								}
 							break;
 						}

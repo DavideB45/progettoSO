@@ -1,24 +1,22 @@
 #include <stdio.h>
-// #include "../utils/utils.c"
 #include <stdlib.h>
 #include <errno.h>
-#include <utils.h>
+#include <unistd.h>
+
+
 #include <pthread.h>
-// #include <files.h>
+
+#include <files.h>
+#include <utils.h>
 #include <request.h>
-
-// int intCompare(void* A, void* B){
-// 	return *((int*) A) - *((int*) B);
-// }
+#include <main.h>
 
 
-#define CLOSED 0
-#define OPENED 1
-#define MAGIC_MARK(X, Y) ((X << 1) | (Y & 1))
-#define GET_REAL(X) X>>1
-#define IS_TO_RESET(X) X % 2 == 1
 
 
+
+
+void read_config(char*);
 // char* testFile();
 
 int main(void){
@@ -28,17 +26,17 @@ int main(void){
 		free(NULL);
 	}
 	printf("\n");
-
-	int fd;
-	printf("value real open\n");
-	fd = MAGIC_MARK(3, CLOSED);
-	printf("%5d %4d %4d\n", fd, GET_REAL(fd), IS_TO_RESET(fd));
-	fd = MAGIC_MARK(3, OPENED);
-	printf("%5d %4d %4d\n", fd, GET_REAL(fd), IS_TO_RESET(fd));
-	fd = MAGIC_MARK(4, CLOSED);
-	printf("%5d %4d %4d\n", fd, GET_REAL(fd), IS_TO_RESET(fd));
-	fd = MAGIC_MARK(4, OPENED);
-	printf("%5d %4d %4d\n", fd, GET_REAL(fd), IS_TO_RESET(fd));
+	read_config("./serv_info/file_config");
+	// int fd;
+	// printf("value real open\n");
+	// fd = MAGIC_MARK(3, CLOSED);
+	// printf("%5d %4d %4d\n", fd, GET_REAL(fd), IS_TO_RESET(fd));
+	// fd = MAGIC_MARK(3, OPENED);
+	// printf("%5d %4d %4d\n", fd, GET_REAL(fd), IS_TO_RESET(fd));
+	// fd = MAGIC_MARK(4, CLOSED);
+	// printf("%5d %4d %4d\n", fd, GET_REAL(fd), IS_TO_RESET(fd));
+	// fd = MAGIC_MARK(4, OPENED);
+	// printf("%5d %4d %4d\n", fd, GET_REAL(fd), IS_TO_RESET(fd));
 
 	// pthread_mutex_t* mute = malloc(sizeof(pthread_mutex_t));
 	// Pthread_mutex_init(mute);
@@ -92,3 +90,31 @@ int main(void){
 
 
 // }
+
+
+void read_config(char* indirizzo){
+	
+	// char* sockName = "default";
+	// int maxFileNum = 0;
+	// int maxFileDim = 0;
+	// int nWorker    = 0;
+
+	FILE * filePtr = NULL;
+	filePtr = fopen(indirizzo, "r");
+	if(filePtr == NULL){
+		printf("fileNotFound\n");
+		return;
+	}
+	int num;
+	char str[20];
+	fscanf(filePtr, "%*[_n_worker]%*[ :=\t]%d%*[ \n]", &num);
+	printf("worker : %d\n", num);
+	fscanf(filePtr, "%*[_max_file]%*[ :=\t]%d\n", &num);
+	printf("maxFil : %d\n", num);
+	fscanf(filePtr, "%*[_max_dim]%*[ :=\t]%d%*[\n MbBm]", &num);
+	printf("maxDim : %d\n", num);
+	fscanf(filePtr, "%*[_socket_name]%*[ :=\t]%s\n", str);
+	printf("nameSo : %s\n", str);
+	fscanf(filePtr, "%*[_file_log_name]%*[ :=\t]%s\n", str);
+	printf("nameLo : %s\n", str);
+}
