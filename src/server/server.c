@@ -196,11 +196,11 @@ void dispatcher(void){
 
 void readConfig(char* indirizzo){
 	
-	char* sockName = "default";
-	char* logFile = "loggo";
-	int maxFileNum = 0;
-	int maxFileDim = 0;
-	int nWorker    = 0;
+	char* sockName = NULL;
+	char* logFile = NULL;
+	int maxFileNum = 10;
+	int maxFileDim = 30;
+	int nWorker    = 3;
 
 	FILE * filePtr = NULL;
 	filePtr = fopen(indirizzo, "r");
@@ -209,53 +209,64 @@ void readConfig(char* indirizzo){
 		return;
 	}
 	int num;
-	char str[20];
+	char str[30];
 
 	fscanf(filePtr, "%*[^_]");
 
-	fscanf(filePtr, "%*[_n_worker]%*[ :=\t]%d%*[ \n]", &num);
-	if(num > 0){
-		nWorker = num;		
+	if(fscanf(filePtr, "%*[_n_worker]%*[ :=\t]%d%*[ \n]", &num) == 1){
+		if(num > 0){
+			nWorker = num;		
+		}
 	}
 	printf("worker : %d\n", nWorker);
 
-	fscanf(filePtr, "%*[_max_file]%*[ :=\t]%d\n", &num);
-	if(num > 0){
-		maxFileNum = num;
+	if(fscanf(filePtr, "%*[_max_file]%*[ :=\t]%d\n", &num) == 1){
+		if(num > 0){
+			maxFileNum = num;
+		}
 	}
 	printf("maxFil : %d\n", maxFileNum);
 
-	fscanf(filePtr, "%*[_max_dim]%*[ :=\t]%d%*[\n MbBm]", &num);
-	if(num > 0){
-		maxFileDim = num;
+	if(fscanf(filePtr, "%*[_max_dim]%*[ :=\t]%d%*[\n MbBm]", &num) == 1){
+		if(num > 0){
+			maxFileDim = num;
+		}
 	}
 	printf("maxDim : %d\n", maxFileDim);
 
-	fscanf(filePtr, "%*[_socket_name]%*[ :=\t]%s\n", str);
-	if(strlen(str) == 1 && str[0] == '0'){
-		srvGen.sockName = malloc(7);
+	if(fscanf(filePtr, "%*[_socket_name]%*[ :=\t]%s\n", str) != 1){
+		str[0] = '0';
+		str[1] = 0;
+	}
+	if( (strlen(str) == 1 && str[0] == '0') || (strcmp(str, "_file_log_name") == 0) ){
+		srvGen.sockName = malloc(18);
 		if(srvGen.sockName == NULL)
 			exit(1);
-		strcpy(srvGen.sockName, "socket");
+		strcpy(srvGen.sockName, "./servWork/socket");
 	} else {
-		srvGen.sockName = malloc( strlen(str) + 1 );
+		srvGen.sockName = malloc( strlen(str) + 1 + 11 );
 		if(srvGen.sockName == NULL)
 			exit(1);
-		strcpy(srvGen.sockName, str);	
+		strcpy(srvGen.sockName, "./servWork/");
+		strcat(srvGen.sockName, str);
 	}
 	printf("nameSo : %s\n", str);
 
-	fscanf(filePtr, "%*[_file_log_name]%*[ :=\t]%s\n", str);
+	if(fscanf(filePtr, "%*[_file_log_name]%*[ :=\t]%s\n", str) != 1){
+		str[0] = '0';
+		str[1] = 0;
+	}
 	if(strlen(str) == 1 && str[0] == '0'){
-		srvGen.logName = malloc(4);
+		srvGen.logName = malloc(15);
 		if(srvGen.logName == NULL)
 			exit(1);
-		strcpy(srvGen.logName, "log");
+		strcpy(srvGen.logName, "./servWork/log");
 	} else {
-		srvGen.logName = malloc( strlen(str) + 1 );
+		srvGen.logName = malloc( strlen(str) + 1 + 11);
 		if(srvGen.logName == NULL)
 			exit(1);
-		strcpy(srvGen.logName, str);	
+		strcpy(srvGen.logName, "./servWork/");
+		strcat(srvGen.logName, str);	
 	}
 	printf("nameLo : %s\n", str);
 }

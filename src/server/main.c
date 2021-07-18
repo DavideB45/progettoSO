@@ -26,7 +26,7 @@ int main(void){
 		free(NULL);
 	}
 	printf("\n");
-	read_config("./serv_info/file_config");
+	read_config("./servWork/file_config");
 	// int fd;
 	// printf("value real open\n");
 	// fd = MAGIC_MARK(3, CLOSED);
@@ -96,9 +96,9 @@ void read_config(char* indirizzo){
 	
 	char* sockName = NULL;
 	char* logFile = NULL;
-	int maxFileNum = 0;
-	int maxFileDim = 0;
-	int nWorker    = 0;
+	int maxFileNum = 10;
+	int maxFileDim = 100;
+	int nWorker    = 5;
 
 	FILE * filePtr = NULL;
 	filePtr = fopen(indirizzo, "r");
@@ -111,50 +111,69 @@ void read_config(char* indirizzo){
 
 	fscanf(filePtr, "%*[^_]");
 
-	fscanf(filePtr, "%*[_n_worker]%*[ :=\t]%d%*[ \n]", &num);
-	if(num > 0){
-		nWorker = num;		
+	if(fscanf(filePtr, "%*[_n_worker]%*[ :=\t]%d%*[ \n]", &num) != 1){
+		printf("default\n");
+	} else {
+		if(num > 0){
+			nWorker = num;		
+		}
 	}
 	printf("worker : %d\n", nWorker);
 
-	fscanf(filePtr, "%*[_max_file]%*[ :=\t]%d\n", &num);
-	if(num > 0){
-		maxFileNum = num;
+	if(fscanf(filePtr, "%*[_max_file]%*[ :=\t]%d\n", &num) != 1){
+		printf("default\n");
+	} else {
+		if(num > 0){
+			maxFileNum = num;
+		}
 	}
 	printf("maxFil : %d\n", maxFileNum);
 
-	fscanf(filePtr, "%*[_max_dim]%*[ :=\t]%d%*[\n MbBm]", &num);
-	if(num > 0){
-		maxFileDim = num;
+	if(fscanf(filePtr, "%*[_max_dim]%*[ :=\t]%d%*[\n MbBm]", &num) != 1){
+		printf("default\n");
+	} else {
+		if(num > 0){
+			maxFileDim = num;
+		}
 	}
 	printf("maxDim : %d\n", maxFileDim);
 
-	fscanf(filePtr, "%*[_socket_name]%*[ :=\t]%s\n", str);
-	printf("%d %c\n", strlen(str), str[0]);
-	if(strlen(str) == 1 && str[0] == '0'){
-		sockName = malloc(7);
-		if(sockName == NULL)
-			exit(1);
-		strcpy(sockName, "socket");
-	} else {
-		sockName = malloc( strlen(str) + 1 );
-		if(sockName == NULL)
-			exit(1);
-		strcpy(sockName, str);	
+	if(fscanf(filePtr, "%*[_socket_name]%*[ :=\t]%s\n", str) != 1){
+		printf("default\n");
+		str[0] = '0';
+		str[1] = 0;
 	}
-	printf("nameSo : %s\n", str);
+	if( (strlen(str) == 1 && str[0] == '0') || (strcmp(str, "_file_log_name") == 0) ){
+		printf("default\n");
+		sockName = malloc(18);
+		if(sockName == NULL)
+			exit(1);
+		strcpy(sockName, "./servWork/socket");
+	} else {
+		sockName = malloc( strlen(str) + 1 + 11 );
+		if(sockName == NULL)
+			exit(1);
+		strcpy(sockName, "./servWork/");
+		strcat(sockName, str);	
+	}
+	printf("nameSo : %s\n", sockName);
 
-	fscanf(filePtr, "%*[_file_log_name]%*[ :=\t]%s\n", str);
-	if(strlen(str) == 1 && str[0] == '0'){
-		logFile = malloc(4);
-		if(logFile == NULL)
-			exit(1);
-		strcpy(logFile, "log");
-	} else {
-		logFile = malloc( strlen(str) + 1 );
-		if(logFile == NULL)
-			exit(1);
-		strcpy(logFile, str);	
+	if(fscanf(filePtr, "%*[_file_log_name]%*[ :=\t]%s\n", str) != 1){
+		printf("default\n");
+		str[0] = '0';
+		str[1] = 0;
 	}
-	printf("nameLo : %s\n", str);
+	if(strlen(str) == 1 && str[0] == '0'){
+		logFile = malloc(15);
+		if(logFile == NULL)
+			exit(1);
+		strcpy(logFile, "./servWork/log");
+	} else {
+		logFile = malloc( strlen(str) + 1 + 11);
+		if(logFile == NULL)
+			exit(1);
+		strcpy(logFile, "./servWork/");
+		strcat(logFile, str);	
+	}
+	printf("nameLo : %s\n", logFile);
 }
