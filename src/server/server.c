@@ -19,17 +19,25 @@
 
 
 ServerInfo srvGen;
+FifoList request;
+
 
 void readConfig(char* indirizzo);
 int initServer(void);
 
-void dispatcher(void);
+void* dispatcher(void);
 //ritorna il massimo FD da ascoltare
 int updatemax(fd_set set, int maxFD);
 
+void* worker(void);
+
+
 int main(int argc, char* argv[]){
 
-
+	if(initServer() != 0){
+		return 1;
+	}
+	
 
 
 	
@@ -38,6 +46,8 @@ int main(int argc, char* argv[]){
 
 int initServer(void){
 	
+	readConfig("./servWork/file_config");
+
 	// creo una pipe
 	// [1] per scrivere [0] per leggere
 	if(pipe(srvGen.doneReq) == -1){
@@ -46,8 +56,7 @@ int initServer(void){
 	}
 
 	unlink(srvGen.sockName);
-	int sock;
-	SOCKET(sock);
+	SOCKET(SOCKET_FD);
 
 	//assegno un indirizzo al socket
 	//struttura generica specializzata di volta in volta
@@ -57,22 +66,25 @@ int initServer(void){
 	strncpy(sa.sun_path, srvGen.sockName,UNIX_PATH_MAX);
 	sa.sun_family=AF_UNIX;
 				//cast neccessario		
-	if( bind(sock,(struct sockaddr *) &sa, sizeof(sa) ) ){//creo socket
+	if( bind(SOCKET_FD,(struct sockaddr *) &sa, sizeof(sa) ) ){//creo socket
 		perror("bind");
 		exit(1);
 	}
 	//tiene un po' di persone in coda per non rifiuare 
 	//se il server non e' subito pronto ad accettarle
-	if(listen(sock,SOMAXCONN)){
+	if(listen(SOCKET_FD,SOMAXCONN)){
 		perror("listen");
 		exit(1);
 	}
 
+
+
+	return 0;
 }
 
-void dispatcher(void){
+void* dispatcher(void){
 	
-	int maxFD = srvGen.sockFD > srvGen.doneReq ? srvGen.sockFD : srvGen.doneReq[0];
+	int maxFD = SOCKET_FD > srvGen.doneReq[0] ? SOCKET_FD : srvGen.doneReq[0];
 	int newConn;
 	int resetConn;
 	int* request;
@@ -193,14 +205,11 @@ void dispatcher(void){
 	
 }
 
-
 void readConfig(char* indirizzo){
 	
-	char* sockName = NULL;
-	char* logFile = NULL;
-	int maxFileNum = 10;
-	int maxFileDim = 30;
-	int nWorker    = 3;
+	srvGen.maxFileNum = 10;
+	srvGen.maxFileDim = 30;
+	srvGen.n_worker    = 3;
 
 	FILE * filePtr = NULL;
 	filePtr = fopen(indirizzo, "r");
@@ -215,24 +224,24 @@ void readConfig(char* indirizzo){
 
 	if(fscanf(filePtr, "%*[_n_worker]%*[ :=\t]%d%*[ \n]", &num) == 1){
 		if(num > 0){
-			nWorker = num;		
+			srvGen.n_worker = num;		
 		}
 	}
-	printf("worker : %d\n", nWorker);
+	printf("worker : %d\n", srvGen.n_worker);
 
 	if(fscanf(filePtr, "%*[_max_file]%*[ :=\t]%d\n", &num) == 1){
 		if(num > 0){
-			maxFileNum = num;
+			srvGen.maxFileNum = num;
 		}
 	}
-	printf("maxFil : %d\n", maxFileNum);
+	printf("maxFil : %d\n", srvGen.maxFileNum);
 
 	if(fscanf(filePtr, "%*[_max_dim]%*[ :=\t]%d%*[\n MbBm]", &num) == 1){
 		if(num > 0){
-			maxFileDim = num;
+			srvGen.maxFileDim = num;
 		}
 	}
-	printf("maxDim : %d\n", maxFileDim);
+	printf("maxDim : %d\n", srvGen.maxFileDim);
 
 	if(fscanf(filePtr, "%*[_socket_name]%*[ :=\t]%s\n", str) != 1){
 		str[0] = '0';
@@ -250,7 +259,7 @@ void readConfig(char* indirizzo){
 		strcpy(srvGen.sockName, "./servWork/");
 		strcat(srvGen.sockName, str);
 	}
-	printf("nameSo : %s\n", str);
+	printf("nameSo : %s\n", srvGen.sockName);
 
 	if(fscanf(filePtr, "%*[_file_log_name]%*[ :=\t]%s\n", str) != 1){
 		str[0] = '0';
@@ -268,7 +277,7 @@ void readConfig(char* indirizzo){
 		strcpy(srvGen.logName, "./servWork/");
 		strcat(srvGen.logName, str);	
 	}
-	printf("nameLo : %s\n", str);
+	printf("nameLo : %s\n", srvGen.logName);
 }
 
 int updatemax(fd_set set, int maxFD){
@@ -278,4 +287,17 @@ int updatemax(fd_set set, int maxFD){
 	}
 	return -1;
 }
+
+void* worker(void){
+	int* readSocK;
+	readSocK = (int*) pop(&request);
+	if(readSocK == NULL && errno == EINVAL){
+		pthread_exit(NULL);
+	} else {
+		int reqId
+		if( readn());
+	}
+	
+}
+
 

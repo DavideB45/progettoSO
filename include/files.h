@@ -41,10 +41,10 @@ int lockFile(ServerFile* obj, int locker);
 int unlockFile(ServerFile* obj, int locker);
 
 //da migliorare
-void startMutex(ServerFile* obj);
+int startMutex(ServerFile* obj);
 
 //da mogliorare
-void endMutex(ServerFile* obj);
+int endMutex(ServerFile* obj);
 
 //aggiunge una richiersta alla coda delle richieste del file
 //ritorna 1 successo ritorna numeri > 1 altrimenti

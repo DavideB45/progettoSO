@@ -4,8 +4,6 @@
 #include <utils.h>
 #include <FifoList.h>
 #include <errno.h>
-// #include "../../include/utils.h"
-// #include "../../include/FifoList.h"
 
 
 // create an empty list
@@ -72,15 +70,18 @@ _Bool insert(FifoList* list, void* elem){
 //remove first element and return its data pointer
 void* pop(FifoList* list){
 	if(list == NULL){
+		errno = EINVAL;
 		return NULL;
 	}
 	
 	if( Pthread_mutex_lock(&(list->lock)) != 0){
+		errno = EPERM;
 		return NULL;
 	}
 	while(list->dim <= 0){	
 		if( pthread_cond_wait(&(list->wait_to_read), &(list->lock)) == EINVAL){
 			Pthread_mutex_unlock( &(list->lock) );
+			errno = EINVAL;
 			return NULL;
 		}
 	}
@@ -95,5 +96,6 @@ void* pop(FifoList* list){
 		free(toFree);
 	
 	Pthread_mutex_unlock( &(list->lock) );
+	errno = 0;
 	return value;
 }
