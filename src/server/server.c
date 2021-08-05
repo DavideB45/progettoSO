@@ -32,7 +32,27 @@ void* dispatcher(void);
 int updatemax(fd_set set, int maxFD);
 
 void* worker(void);
-void manageRequest(int oper, int client);
+void manageRequest(Request* req);
+// chiude la connessione con il client
+void closeConnection(int client);
+// apre un file (open = intero che definisce opzioni)
+void openFile(Request* req);
+// scrive al client il contenuto del file
+void readFile(Request* req);
+// scrive al client il contenuto di N files
+void readNFiles(Request* req);
+// scrive nel file richiesto dal client
+void writeFile(Request* req);
+// appende al file richiesto dal client
+void appendToFile(Request* req);
+// attiva la mutua esclusione su un file
+void lockFileW(Request* req);
+// termina la mutua esclusione su un file
+void unlockFileW(Request* req);
+// chiude il file per il client
+void closeFile(Request* req);
+//rimuove il file dal server
+void removeFile(Request* req);
 
 
 // reception
@@ -320,11 +340,59 @@ void* worker(void){
 			}
 		break;
 		default:
-			manageRequest(oper, clId);
+			Request* req = newRequest(oper, clId, NULL, 0, NULL);
+			manageRequest(req);
 		break;
 		}
 	} 
 	
 }
 
-void manageRequest(int oper, int client);
+void manageRequest(Request* req){
+	switch(GET_OP(req->oper)){
+	case CLOSE_CONNECTION:
+		/* non dovrebbe arrivare qui' a seconda dell'implementazione */
+		closeConnection(req->client);
+		printf("CLOSE_CONNECTION\n");
+	break;
+	case OPEN_FILE:
+		printf("OPEN_FILE\n");\
+		openFile(req);
+	break;
+	case READ_FILE:
+		printf("READ_FILE\n");
+		readFile(req);
+	break;
+	case READ_N_FILES:
+		printf("READ_N_FILES\n");
+		readNFiles(req);
+	break;
+	case WRITE_FILE:
+		printf("WRITE_FILE\n");
+		writeFile(req);
+	break;
+	case APPEND_TO_FILE:
+		printf("APPEND_TO_FILE\n");
+		appendToFile(req);
+	break;
+	case LOCK_FILE:
+		printf("LOCK_FILE\n");
+		lockFileW(req);
+	break;
+	case UNLOCK_FILE:
+		printf("UNLOCK_FILE\n");
+		unlockFileW(req);
+	break;
+	case CLOSE_FILE:
+		printf("CLOSE_FILE\n");
+		closeFile(req);
+	break;
+	case REMOVE_FILE:
+		printf("REMOVE_FILE\n");
+		removeFile(req);
+	break;
+	default:
+		printf("operazione sconosciuta\n");
+	break;
+	}
+}

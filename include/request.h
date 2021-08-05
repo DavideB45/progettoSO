@@ -18,7 +18,8 @@ enum operat {
 
 enum servErrorRet {
 	IMPOSSIBLE_READ,
-	NO_OP_SUPPORT
+	NO_OP_SUPPORT,
+	NO_SUCH_FILE
 };
 
 
@@ -65,12 +66,13 @@ typedef struct Request{
 	int oper;
 	int client;
 	char* sFileName;
+	int editDim;
 	char* forEdit;//da usare es per append
 }Request;
 
 // crea una struct richiesta con i parametri passati
 // ritorna NULL se fallisce
-Request* newRequest(int oper, int client, char* sFilename, char* forEdit);
+Request* newRequest(int oper, int client, char* sFilename, int editDim, char* forEdit);
 
 // libera la memoria usata da una richiesta
 void destroyRequest(Request* req);

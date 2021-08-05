@@ -4,7 +4,7 @@
 #include <request.h>
 
 // crea una struct richiesta con i parametri passati
-Request* newRequest(int oper, int client, char* sFilename, char* forEdit){
+Request* newRequest(int oper, int client, char* sFilename, int editDim, char* forEdit){
 	Request* req = malloc(sizeof(Request));
 	if(req == NULL){
 		perror(malloc);
@@ -12,8 +12,10 @@ Request* newRequest(int oper, int client, char* sFilename, char* forEdit){
 	}
 	req->oper = oper;
 	req->client = client;
-	req->forEdit = forEdit;
 	req->sFileName = sFilename;
+	req->editDim = editDim;
+	req->forEdit = forEdit;
+
 	return req;
 }
 
