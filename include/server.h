@@ -12,7 +12,7 @@
 // chiusura di un socket ricevuto sulla pipe
 #define NOT_CONNECTED 0
 #define CONNECTED 1
-#define CONN_MARK(X, Y) ((X << 1) | (Y & 1))
+#define CONN_MARK(X, Y) X = ((X << 1) | (Y & 1))
 #define GET_FD(X) X>>1
 #define IS_TO_RESET(X) X % 2 == 1
 

@@ -7,6 +7,8 @@
 #include <utils.h>
 #include <server.h>
 #include <FifoList.h>
+#include <request.h>
+#include <tree.h>
 
 // connection
 #include <sys/socket.h>
@@ -19,18 +21,21 @@
 
 
 ServerInfo srvGen;
-FifoList request;
-
+FifoList resourceQueue;
+TreeFile* fileStorage;
 
 void readConfig(char* indirizzo);
 int initServer(void);
 
 void* dispatcher(void);
-//ritorna il massimo FD da ascoltare
+// ritorna il massimo FD da ascoltare
 int updatemax(fd_set set, int maxFD);
 
 void* worker(void);
+void manageRequest(int oper, int client);
 
+
+// reception
 
 int main(int argc, char* argv[]){
 
@@ -174,7 +179,7 @@ void* dispatcher(void){
 									FD_CLR(GET_FD(resetConn), &set);
 									if(close(GET_FD(resetConn))){
 										perror("close client");
-									}
+									}									
 								}
 							break;
 						}
@@ -290,14 +295,36 @@ int updatemax(fd_set set, int maxFD){
 
 void* worker(void){
 	int* readSocK;
-	readSocK = (int*) pop(&request);
-	if(readSocK == NULL && errno == EINVAL){
+	readSocK = (int*) pop(&(srvGen.toServe));
+	if(readSocK == NULL){
 		pthread_exit(NULL);
 	} else {
-		int reqId
-		if( readn());
-	}
+		int clId = *readSocK;
+		int oper = 0;
+		int ret = 0;
+		switch( readn(clId, &oper, sizeof(int)) ){
+		case -1:
+			/* errore in lettura non risolvibile */			
+			ret = IMPOSSIBLE_READ;
+			CONN_MARK(clId, NOT_CONNECTED);
+			writen(clId, &ret, sizeof(int));
+			if( writen(srvGen.doneReq[1], clId, sizeof(int)) == -1){
+				exit(EXIT_FAILURE);
+			}
+		break;
+		case 0:
+			/* il client ha chiuso il socket */
+			CONN_MARK(clId, NOT_CONNECTED);
+			if( writen(srvGen.doneReq[1], clId, sizeof(int)) == -1){
+				exit(EXIT_FAILURE);
+			}
+		break;
+		default:
+			manageRequest(oper, clId);
+		break;
+		}
+	} 
 	
 }
 
-
+void manageRequest(int oper, int client);

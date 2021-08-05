@@ -25,6 +25,7 @@ ServerFile* newServerFile(int creator, int O_lock){
 		return NULL;
 	}
 	
+
 	ServerFile *newFile = malloc(sizeof(ServerFile));
 	if(newFile == NULL){
 		//non ho creato newFile
@@ -32,6 +33,7 @@ ServerFile* newServerFile(int creator, int O_lock){
 		return NULL;
 	}
 	
+	newFile->creator = creator;
 	newFile->data = NULL;
 	newFile->dim = 0;
 	newFile->flagUse = 1;
@@ -75,7 +77,8 @@ ServerFile* newServerFile(int creator, int O_lock){
 		free(newFile);
 		generalListDestroy(newFile->openList);
 		return NULL;
-	}
+	}	
+
 	return newFile;
 }
 

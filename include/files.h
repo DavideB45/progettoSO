@@ -17,17 +17,18 @@ typedef struct ServerFile{
 	GeneralList* requestList;// riempita da atri thread
 	int dim;//capire quale deve essere l'unita' di misura
 	char* data;
+	int creator;
 }ServerFile;
 
 
 // funzione che ritorna 0;
 int fakeComp(const void* a,const void* b);
 
-//crea un nuovo file per il server
-//ritorna NULL se fallisce
+// crea un nuovo file per il server
+// ritorna NULL se fallisce
 ServerFile* newServerFile(int creator, int O_lock);
 
-//distruggr il file
+// distruggr il file
 // setta obj = NULL
 void destroyServerFile(ServerFile* obj);
 
