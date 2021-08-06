@@ -22,6 +22,7 @@
 
 ServerInfo srvGen;
 FifoList resourceQueue;
+FifoList logQueue;
 TreeFile* fileStorage;
 
 void readConfig(char* indirizzo);
@@ -32,27 +33,28 @@ void* dispatcher(void);
 int updatemax(fd_set set, int maxFD);
 
 void* worker(void);
+// esegue una richiesta
 void manageRequest(Request* req);
 // chiude la connessione con il client
-void closeConnection(int client);
+int closeConnection(int client);
 // apre un file (open = intero che definisce opzioni)
-void openFile(Request* req);
+int openFile(Request* req, ServerFile* filePtr);
 // scrive al client il contenuto del file
-void readFile(Request* req);
+int readFile(Request* req, ServerFile* filePtr);
 // scrive al client il contenuto di N files
-void readNFiles(Request* req);
+int readNFiles(Request* req);
 // scrive nel file richiesto dal client
-void writeFile(Request* req);
+int writeFile(Request* req, ServerFile* filePtr);
 // appende al file richiesto dal client
-void appendToFile(Request* req);
+int appendToFile(Request* req, ServerFile* filePtr);
 // attiva la mutua esclusione su un file
-void lockFileW(Request* req);
+int lockFileW(Request* req, ServerFile* filePtr);
 // termina la mutua esclusione su un file
-void unlockFileW(Request* req);
+int unlockFileW(Request* req, ServerFile* filePtr);
 // chiude il file per il client
-void closeFile(Request* req);
+int closeFile(Request* req, ServerFile* filePtr);
 //rimuove il file dal server
-void removeFile(Request* req);
+int removeFile(Request* req, ServerFile* filePtr);
 
 
 // reception
@@ -335,6 +337,7 @@ void* worker(void){
 		case 0:
 			/* il client ha chiuso il socket */
 			CONN_MARK(clId, NOT_CONNECTED);
+			/* informare */
 			if( writen(srvGen.doneReq[1], clId, sizeof(int)) == -1){
 				exit(EXIT_FAILURE);
 			}
@@ -349,50 +352,79 @@ void* worker(void){
 }
 
 void manageRequest(Request* req){
-	switch(GET_OP(req->oper)){
-	case CLOSE_CONNECTION:
-		/* non dovrebbe arrivare qui' a seconda dell'implementazione */
-		closeConnection(req->client);
-		printf("CLOSE_CONNECTION\n");
-	break;
-	case OPEN_FILE:
-		printf("OPEN_FILE\n");\
-		openFile(req);
-	break;
-	case READ_FILE:
-		printf("READ_FILE\n");
-		readFile(req);
-	break;
-	case READ_N_FILES:
-		printf("READ_N_FILES\n");
-		readNFiles(req);
-	break;
-	case WRITE_FILE:
-		printf("WRITE_FILE\n");
-		writeFile(req);
-	break;
-	case APPEND_TO_FILE:
-		printf("APPEND_TO_FILE\n");
-		appendToFile(req);
-	break;
-	case LOCK_FILE:
-		printf("LOCK_FILE\n");
-		lockFileW(req);
-	break;
-	case UNLOCK_FILE:
-		printf("UNLOCK_FILE\n");
-		unlockFileW(req);
-	break;
-	case CLOSE_FILE:
-		printf("CLOSE_FILE\n");
-		closeFile(req);
-	break;
-	case REMOVE_FILE:
-		printf("REMOVE_FILE\n");
-		removeFile(req);
-	break;
-	default:
-		printf("operazione sconosciuta\n");
-	break;
-	}
+	ServerFile* filePtr = NULL;
+	Request* newReq = NULL;
+	enum operResult result = NONE;
+	do{
+		switch(GET_OP(req->oper)){
+		case CLOSE_CONNECTION:
+			/* non dovrebbe arrivare qui' a seconda dell'implementazione */
+			closeConnection(req->client);
+			printf("CLOSE_CONNECTION\n");
+		break;
+		case OPEN_FILE:
+			printf("OPEN_FILE\n");\
+			if(req->sFileName != NULL){
+				/* e' la prima volta che vediamo questa richiesta */
+				int dim ;
+				switch( readn(req->client, &dim, sizeof(int)) ){
+					case -1:
+					/* errore in lettura */
+					// chiudo client e continuo operazioni su un file se ci sto lavorando
+					break;
+					case 0:
+						/* client ha chiuso la connessione */
+					break;
+					default:
+					break;
+				}
+				
+			}
+			openFile(req);
+		break;
+		case READ_FILE:
+			printf("READ_FILE\n");
+			readFile(req);
+		break;
+		case READ_N_FILES:
+			printf("READ_N_FILES\n");
+			readNFiles(req);
+		break;
+		case WRITE_FILE:
+			printf("WRITE_FILE\n");
+			writeFile(req);
+		break;
+		case APPEND_TO_FILE:
+			printf("APPEND_TO_FILE\n");
+			appendToFile(req);
+		break;
+		case LOCK_FILE:
+			printf("LOCK_FILE\n");
+			lockFileW(req);
+		break;
+		case UNLOCK_FILE:
+			printf("UNLOCK_FILE\n");
+			unlockFileW(req);
+		break;
+		case CLOSE_FILE:
+			printf("CLOSE_FILE\n");
+			closeFile(req);
+		break;
+		case REMOVE_FILE:
+			printf("REMOVE_FILE\n");
+			removeFile(req);
+		break;
+		default:
+			printf("operazione sconosciuta\n");
+		break;
+		}
+
+		if( filePtr == NULL && (result == FAILED_CONT|| result == COMPLETED_CONT) ){
+			/*	ho fatto la prima operazione su un file ma 
+				per qualche motivo non c'e'
+				deve essere sbagliato qualcosa */
+		}
+
+	}while( result != FAILED_CONT && result != COMPLETED_CONT );
+	
 }

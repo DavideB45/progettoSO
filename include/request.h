@@ -19,6 +19,7 @@ enum operat {
 enum servErrorRet {
 	IMPOSSIBLE_READ,
 	NO_OP_SUPPORT,
+	INVALID_DIM,
 	NO_SUCH_FILE
 };
 
@@ -57,7 +58,7 @@ enum servErrorRet {
 #define GET_O_NON_BLOCK(x) (x & (1 << 22)) == (1 << 22)
 
 // scrive la dimensione del nome del file
-#define SET_PATH_DIM(x, dim) x = x | (dim & 0x003fffff)
+#define SET_PATH_DIM(x, dim) x = x | (dim)
 #define GET_PATH_DIM(x) x & 0x003fffff
 
 

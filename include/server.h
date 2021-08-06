@@ -20,6 +20,15 @@
 #define S_SLOW_CLOSE 1
 #define S_FAST_CLOSE 2
 
+enum operResult{
+	FAILED_CONT,// fallita ma il worker puo' continuare la gestione del file
+	COMPLETED_CONT,// eseguita con successo, il worker puo' continuare
+	FAILED_STOP,// DELAIED  MISSING_FILE
+	COMPLETED_STOP,// LOCK
+	FILE_DELETED,// file cancellato dall'op, il worker informa altre richieste
+	NONE// indica operazioni che non riguardano un singolo file
+};
+
 
 typedef struct ServerInfo{
 	char* sockName;
