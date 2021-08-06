@@ -19,6 +19,10 @@
 
 #define SOCKET_FD srvGen.sockFD
 
+#define PIPE_WRITE(client)  if( writen(srvGen.doneReq[1], &client, sizeof(int)) == -1){\
+								perror("writen");\
+								exit(EXIT_FAILURE);\
+							}
 
 ServerInfo srvGen;
 FifoList resourceQueue;
@@ -56,6 +60,17 @@ int closeFile(Request* req, ServerFile* filePtr);
 //rimuove il file dal server
 int removeFile(Request* req, ServerFile* filePtr);
 
+//////////////////////////////////////////////////////////////
+// legge da un socket e lo chiude in caso di fallimento di readn
+// informa il dispatcher
+int readFormSocket(int sock, void* buff, int dim);
+// invia al client errori che non chiudono la connessione
+// in caso di fallimento di writen il socket viene chiuso
+void sendClientError(int sock, int err);
+// segnala al client un errore fatale 
+// duarnte la lettura dal socket
+void sendClientImpRead(int sock);
+//////////////////////////////////////////////////////////////
 
 // reception
 
@@ -323,24 +338,15 @@ void* worker(void){
 	} else {
 		int clId = *readSocK;
 		int oper = 0;
-		int ret = 0;
 		switch( readn(clId, &oper, sizeof(int)) ){
 		case -1:
 			/* errore in lettura non risolvibile */			
-			ret = IMPOSSIBLE_READ;
-			CONN_MARK(clId, NOT_CONNECTED);
-			writen(clId, &ret, sizeof(int));
-			if( writen(srvGen.doneReq[1], clId, sizeof(int)) == -1){
-				exit(EXIT_FAILURE);
-			}
+			sendClientImpRead(clId);
 		break;
 		case 0:
 			/* il client ha chiuso il socket */
 			CONN_MARK(clId, NOT_CONNECTED);
-			/* informare */
-			if( writen(srvGen.doneReq[1], clId, sizeof(int)) == -1){
-				exit(EXIT_FAILURE);
-			}
+			PIPE_WRITE(clId)
 		break;
 		default:
 			Request* req = newRequest(oper, clId, NULL, 0, NULL);
@@ -355,6 +361,7 @@ void manageRequest(Request* req){
 	ServerFile* filePtr = NULL;
 	Request* newReq = NULL;
 	enum operResult result = NONE;
+	int buffInt = 0;
 	do{
 		switch(GET_OP(req->oper)){
 		case CLOSE_CONNECTION:
@@ -363,28 +370,51 @@ void manageRequest(Request* req){
 			printf("CLOSE_CONNECTION\n");
 		break;
 		case OPEN_FILE:
-			printf("OPEN_FILE\n");\
-			if(req->sFileName != NULL){
+			printf("OPEN_FILE\n");
+			if(req->sFileName == NULL){
 				/* e' la prima volta che vediamo questa richiesta */
-				int dim ;
-				switch( readn(req->client, &dim, sizeof(int)) ){
-					case -1:
-					/* errore in lettura */
-					// chiudo client e continuo operazioni su un file se ci sto lavorando
-					break;
-					case 0:
-						/* client ha chiuso la connessione */
-					break;
-					default:
-					break;
+				int dim = GET_PATH_DIM(req->oper);
+				req->sFileName = malloc(dim + 1);
+				if(req->sFileName == NULL){
+					/* non c'e' spazio */
+					sendClientError(req->client, NO_MEMORY);
+				} else {
+					/* c'e' spazio */
+					if( readFormSocket(req->client, req->sFileName, dim + 1) == 1){
+						/* tutto ok */
+						filePtr = TreeFileFind(fileStorage, req->sFileName);
+						if(filePtr == NULL){
+							/* file non trovato */
+							if(errno == 0){
+								sendClientError(req->client, NO_SUCH_FILE);
+							} else{
+								sendClientError(req->client, UNKNOWN_ERROR);
+							}
+							result = FAILED_STOP;
+						} else {
+							/* file trovato (eseguo la richiesta) */
+							result = openFile(req, filePtr);
+						}
+					} else {
+						/* non ho letto il nome */
+						sendClientImpRead(req->client);
+						result = FAILED_STOP;
+					}
 				}
-				
+				/*  alla fine di questo if filePtr non puo' essere NULL
+					nel caso lo sia non effettueremo altri cicli perche'
+					non abbiamo un file su cui operare
+					quindi se siamo nel ramo else signifia che quell'operazione
+					era stata gia' trovata da un altro client in precedenza
+					quindi e' stata rimossa dalla lista di richieste del file */
+			} else {
+				result = openFile(req, filePtr);
 			}
-			openFile(req);
+			
 		break;
 		case READ_FILE:
 			printf("READ_FILE\n");
-			readFile(req);
+			readFile(req, filePtr);
 		break;
 		case READ_N_FILES:
 			printf("READ_N_FILES\n");
@@ -392,34 +422,34 @@ void manageRequest(Request* req){
 		break;
 		case WRITE_FILE:
 			printf("WRITE_FILE\n");
-			writeFile(req);
+			writeFile(req, filePtr);
 		break;
 		case APPEND_TO_FILE:
 			printf("APPEND_TO_FILE\n");
-			appendToFile(req);
+			appendToFile(req, filePtr);
 		break;
 		case LOCK_FILE:
 			printf("LOCK_FILE\n");
-			lockFileW(req);
+			lockFileW(req, filePtr);
 		break;
 		case UNLOCK_FILE:
 			printf("UNLOCK_FILE\n");
-			unlockFileW(req);
+			unlockFileW(req, filePtr);
 		break;
 		case CLOSE_FILE:
 			printf("CLOSE_FILE\n");
-			closeFile(req);
+			closeFile(req, filePtr);
 		break;
 		case REMOVE_FILE:
 			printf("REMOVE_FILE\n");
-			removeFile(req);
+			removeFile(req, filePtr);
 		break;
 		default:
 			printf("operazione sconosciuta\n");
 		break;
 		}
 
-		if( filePtr == NULL && (result == FAILED_CONT|| result == COMPLETED_CONT) ){
+		if( filePtr != NULL && (result == FAILED_CONT|| result == COMPLETED_CONT) ){
 			/*	ho fatto la prima operazione su un file ma 
 				per qualche motivo non c'e'
 				deve essere sbagliato qualcosa */
@@ -427,4 +457,53 @@ void manageRequest(Request* req){
 
 	}while( result != FAILED_CONT && result != COMPLETED_CONT );
 	
+}
+
+
+int readFormSocket(int sock, void* buff, int dim){
+	int buffInt;
+	switch( readn(sock, buff, dim) ){
+	case -1:
+		/* impossible read */
+		buffInt = IMPOSSIBLE_READ;
+		writen(sock, &buffInt, sizeof(int));
+		buffInt = sock;
+		CONN_MARK(buffInt, NOT_CONNECTED);
+		PIPE_WRITE(buffInt);
+		return 0;
+	break;
+	case 0:
+		/* client chiuso EOF */
+		buffInt = sock;
+		CONN_MARK(buffInt, NOT_CONNECTED);
+		PIPE_WRITE(buffInt);
+		return 0;
+	break;
+	default:
+		return 1;
+	break;
+	}
+}
+
+void sendClientError(int sock, int err){
+	int buffInt;
+	if( writen(sock, &err, sizeof(int)) == 1){
+		/* riesco a informare il client */
+		buffInt = sock;
+		CONN_MARK(buffInt, CONNECTED);
+		PIPE_WRITE(buffInt);
+	} else {
+		/* non riesco a informare il client */
+		buffInt = sock;
+		CONN_MARK(buffInt, NOT_CONNECTED);
+		PIPE_WRITE(buffInt);
+	}
+}
+
+void sendClientImpRead(int sock){
+	int buffInt = IMPOSSIBLE_READ;
+	writen(sock, &buffInt, sizeof(int));
+	buffInt = sock;
+	CONN_MARK(buffInt, NOT_CONNECTED);
+	PIPE_WRITE(buffInt);
 }

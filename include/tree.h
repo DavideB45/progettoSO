@@ -66,7 +66,7 @@ ServerFile* TreeFileRemove(TreeFile* tree, char* name);
 // trova e ritorna il file identificato con nome
 // ritorna puntatore al file
 // NULL = non trovato / bad address
-static ServerFile* TreeFileFind(TreeFile* tree, char* name);
+ServerFile* TreeFileFind(TreeFile* tree, char* name);
 
 // getNElements
 // restituisce un puntatore ad un 
