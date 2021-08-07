@@ -10,13 +10,14 @@
 
 typedef struct ServerFile{
 	pthread_mutex_t lock;
-	_Bool flagUse;
+	_Bool flagUse;// un thread lo sta gestendo
 	_Bool flagO_lock;
 	int lockOwner;// cliend ID = Inode del coso per prlarci
-	GeneralList* openList;// 
+	GeneralList* openList;// client che hanno aperto
 	GeneralList* requestList;// riempita da atri thread
 	int dim;//capire quale deve essere l'unita' di misura
 	char* data;
+	char* namePath;
 	int creator;
 }ServerFile;
 
@@ -26,7 +27,7 @@ int fakeComp(const void* a,const void* b);
 
 // crea un nuovo file per il server
 // ritorna NULL se fallisce
-ServerFile* newServerFile(int creator, int O_lock);
+ServerFile* newServerFile(int creator, int O_lock, char* nameP);
 
 // distruggr il file
 // setta obj = NULL

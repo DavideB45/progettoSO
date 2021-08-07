@@ -19,6 +19,14 @@
 
 #define SOCKET_FD srvGen.sockFD
 
+// macro per usare l'array dei thread
+#define PERSONAL_LOCK_ACQUIRE   Pthread_mutex_lock( &(srvGen.threadUse[threadId]->lock) )
+#define PERSONAL_LOCK_RELEASE   Pthread_mutex_unlock( &(srvGen.threadUse[threadId]->lock) )
+#define PERSONAL_FILE_SET(fPtr) srvGen.threadUse[threadId]->filePtr = fPtr
+#define TREAD_LOCK_ACQUIRE(id)  Pthread_mutex_lock( &(srvGen.threadUse[id]->lock) )
+#define TREAD_LOCK_ACQUIRE(id)  Pthread_mutex_unlock( &(srvGen.threadUse[id]->lock) )
+#define THREAD_FILE_GET(id)     srvGen.threadUse[id]->filePtr
+
 #define PIPE_WRITE(client)  if( writen(srvGen.doneReq[1], &client, sizeof(int)) == -1){\
 								perror("writen");\
 								exit(EXIT_FAILURE);\
@@ -36,9 +44,24 @@ void* dispatcher(void);
 // ritorna il massimo FD da ascoltare
 int updatemax(fd_set set, int maxFD);
 
-void* worker(void);
+
+// il puntatore a intero passato indica il suo posto nell'array
+void* worker(void*);
 // esegue una richiesta
-void manageRequest(Request* req);
+void manageRequest(Request* req, int threadId);
+// setta il flag in use di un file
+// torna 1 se successo
+// rorna 0 se fallisce
+// non effettua controlli sugli argomenti passati
+int tryUse(ServerFile* filePtr, Request* req, int closeOnFail);
+// indica che smette di usare il file
+// non effettua controlli sugli argomenti passati
+// non puo' essere implementata perche' il controllo deve guardare anche la coda
+// e' piu' semplice farlo nella funzione manage request
+void markAsFree(ServerFile* filePtr);
+// ritorna quando nessuno possiede un puntatore al file che voglio rimuovere
+void safeRemove(ServerFile* filePtr, int threadId);
+
 // chiude la connessione con il client
 int closeConnection(int client);
 // apre un file (open = intero che definisce opzioni)
@@ -60,6 +83,7 @@ int closeFile(Request* req, ServerFile* filePtr);
 //rimuove il file dal server
 int removeFile(Request* req, ServerFile* filePtr);
 
+
 //////////////////////////////////////////////////////////////
 // legge da un socket e lo chiude in caso di fallimento di readn
 // informa il dispatcher
@@ -69,7 +93,7 @@ int readFormSocket(int sock, void* buff, int dim);
 void sendClientError(int sock, int err);
 // segnala al client un errore fatale 
 // duarnte la lettura dal socket
-void sendClientImpRead(int sock);
+void sendClientFatalError(int sock, int err);
 //////////////////////////////////////////////////////////////
 
 // reception
@@ -257,6 +281,7 @@ void readConfig(char* indirizzo){
 	filePtr = fopen(indirizzo, "r");
 	if(filePtr == NULL){
 		printf("fileNotFound\n");
+		/////////////////////////////////inserire nomi e thread
 		return;
 	}
 	int num;
@@ -268,6 +293,27 @@ void readConfig(char* indirizzo){
 		if(num > 0){
 			srvGen.n_worker = num;		
 		}
+	}
+	srvGen.threadUse = malloc(sizeof(ThreadInfo*)*srvGen.n_worker);
+	if(srvGen.threadUse == NULL){
+		perror("malloc threadUse[]");
+		exit(EXIT_FAILURE);
+	}
+	for(size_t i = 0; i < srvGen.n_worker; i++){
+		srvGen.threadUse[i] = malloc(sizeof(ThreadInfo));
+		if(srvGen.threadUse[i] == NULL){
+			perror("malloc threadUse");
+			exit(EXIT_FAILURE);
+		}
+		if( Pthread_mutex_init( &(srvGen.threadUse[i]->lock) ) != 0){
+			perror("mutex init threadUse");
+			exit(EXIT_FAILURE);
+		}
+		if(pthread_cond_init(&(srvGen.threadUse[i]->completedReq), NULL) != 0){
+			perror("cond init threadUse");
+			exit(EXIT_FAILURE);
+		}
+		srvGen.threadUse[i]->filePtr = NULL;
 	}
 	printf("worker : %d\n", srvGen.n_worker);
 
@@ -330,7 +376,8 @@ int updatemax(fd_set set, int maxFD){
 	return -1;
 }
 
-void* worker(void){
+void* worker(void* idThread){
+	int threadId = *((int*) idThread);
 	int* readSocK;
 	readSocK = (int*) pop(&(srvGen.toServe));
 	if(readSocK == NULL){
@@ -341,7 +388,7 @@ void* worker(void){
 		switch( readn(clId, &oper, sizeof(int)) ){
 		case -1:
 			/* errore in lettura non risolvibile */			
-			sendClientImpRead(clId);
+			sendClientFatalError(clId, IMPOSSIBLE_READ);
 		break;
 		case 0:
 			/* il client ha chiuso il socket */
@@ -350,14 +397,14 @@ void* worker(void){
 		break;
 		default:
 			Request* req = newRequest(oper, clId, NULL, 0, NULL);
-			manageRequest(req);
+			manageRequest(req, threadId);
 		break;
 		}
 	} 
 	
 }
 
-void manageRequest(Request* req){
+void manageRequest(Request* req, int threadId){
 	ServerFile* filePtr = NULL;
 	Request* newReq = NULL;
 	enum operResult result = NONE;
@@ -378,26 +425,44 @@ void manageRequest(Request* req){
 				if(req->sFileName == NULL){
 					/* non c'e' spazio */
 					sendClientError(req->client, NO_MEMORY);
+					destroyRequest(req);
+					result = FAILED_STOP;
 				} else {
 					/* c'e' spazio */
 					if( readFormSocket(req->client, req->sFileName, dim + 1) == 1){
 						/* tutto ok */
-						filePtr = TreeFileFind(fileStorage, req->sFileName);
-						if(filePtr == NULL){
-							/* file non trovato */
-							if(errno == 0){
-								sendClientError(req->client, NO_SUCH_FILE);
-							} else{
-								sendClientError(req->client, UNKNOWN_ERROR);
-							}
+						if( PERSONAL_LOCK_ACQUIRE != 0){
+							/* non posso eseguire */
+							perror("Personal lock acquire");
+							sendClientError(req->client, UNKNOWN_ERROR);
+							destroyRequest(req);
 							result = FAILED_STOP;
 						} else {
-							/* file trovato (eseguo la richiesta) */
-							result = openFile(req, filePtr);
+							filePtr = TreeFileFind(fileStorage, req->sFileName);
+							if(filePtr == NULL){
+								PERSONAL_LOCK_RELEASE;
+								/* file non trovato */
+								if(errno == 0){
+									sendClientError(req->client, NO_SUCH_FILE);
+								} else{
+									sendClientError(req->client, UNKNOWN_ERROR);
+								}
+								destroyRequest(req);
+								result = FAILED_STOP;
+							} else {
+								/* file trovato (eseguo la richiesta) */
+								PERSONAL_FILE_SET(filePtr);
+								PERSONAL_LOCK_RELEASE;
+								if(tryUse(filePtr, req, FALSE)){
+									result = openFile(req, filePtr);
+								} else {
+									result = FAILED_STOP;
+								}
+							}
 						}
 					} else {
 						/* non ho letto il nome */
-						sendClientImpRead(req->client);
+						sendClientFatalError(req->client, IMPOSSIBLE_READ);
 						result = FAILED_STOP;
 					}
 				}
@@ -449,14 +514,56 @@ void manageRequest(Request* req){
 		break;
 		}
 
-		if( filePtr != NULL && (result == FAILED_CONT|| result == COMPLETED_CONT) ){
-			/*	ho fatto la prima operazione su un file ma 
-				per qualche motivo non c'e'
-				deve essere sbagliato qualcosa */
+		if( filePtr != NULL && (result == FAILED_CONT || result == COMPLETED_CONT) ){
+			/* devo disfarmi della richiesta eseguita */
+			destroyRequest(req);
+			/* devo continuare a lavorare */
+			if( Pthread_mutex_lock( &(filePtr->lock) ) == -1){
+				perror("lockFile");
+				TreeFileRemove(fileStorage, req->sFileName);
+				//////////informa file di log////////////////////////////////////////////
+				destroyRequest(req);
+				result = FILE_DELETED;
+			} else {
+				req = generalListPop(filePtr->requestList);
+				if(req == NULL){
+					/* ho finito le richieste residue */
+					filePtr->flagUse = 0;
+					if(result == FAILED_CONT){
+						result = FAILED_STOP;
+					} else {
+						result = COMPLETED_STOP;
+					}
+					
+				}
+				// pensare se togliere tutta la gestione dell' errore
+				if(Pthread_mutex_unlock( &(filePtr->lock) ) != 0){
+					// se non riesco a fare unlock gli altri non possono lasciarmi le loro 
+					// richieste quindi non possono chiamare signal quindi c'e' deadlock
+					perror("unlockFile");
+					TreeFileRemove(fileStorage, req->sFileName);
+					//////////informa file di log////////////////////////////////////////////
+					if(req != NULL){
+						sendClientFatalError(req->client, UNKNOWN_ERROR);
+						// si puo' evitare di mandare sempre errori fatali con un if/else
+						destroyRequest(req);
+					}
+					result = FILE_DELETED;
+				}
+			}
 		}
 
-	}while( result != FAILED_CONT && result != COMPLETED_CONT );
+	}while( req != NULL && result != FAILED_CONT && result != COMPLETED_CONT );
 	
+	if(result == FILE_DELETED){
+		safeRemove(filePtr, threadId);
+		// posso eseguire come single thread
+		/* mi occupo di informare gli altri client*/
+		destroyServerFile(filePtr);
+	}
+	/* gestire gli altri casi */
+	
+	/* mettere NULL come file che sto gestendo */
 }
 
 
@@ -500,10 +607,44 @@ void sendClientError(int sock, int err){
 	}
 }
 
-void sendClientImpRead(int sock){
-	int buffInt = IMPOSSIBLE_READ;
+void sendClientFatalError(int sock, int err){
+	int buffInt = err;
 	writen(sock, &buffInt, sizeof(int));
 	buffInt = sock;
 	CONN_MARK(buffInt, NOT_CONNECTED);
 	PIPE_WRITE(buffInt);
+}
+
+int tryUse(ServerFile* filePtr, Request* req, int closeOnFail){
+	
+	if( Pthread_mutex_lock( &(filePtr->lock)) != 0){
+		if(closeOnFail){
+			sendClientFatalError(req->client ,UNKNOWN_ERROR_F);
+		} else {
+			sendClientError(req->client, UNKNOWN_ERROR);
+		}
+		return 0;
+	}
+	if(filePtr->flagUse){
+		if( generalListInsert(filePtr->requestList, req) == 0){
+			/* operazione fallita (non ho messo in coda) */
+			Pthread_mutex_unlock(&(filePtr->lock));
+			if(closeOnFail){
+				sendClientFatalError(req->client ,UNKNOWN_ERROR_F);
+			} else {
+				sendClientError(req->client, UNKNOWN_ERROR);
+			}
+			destroyRequest(req);
+		} else {
+			/* richiesta messa in coda */
+			Pthread_mutex_unlock(&(filePtr->lock));
+		}
+		return 0;
+	} else {
+		/* il thread inizia a gestire il file */
+		filePtr->flagUse = 1;
+		Pthread_mutex_unlock(&(filePtr->lock));
+		return 1;
+	}
+	
 }

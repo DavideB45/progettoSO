@@ -21,6 +21,10 @@ Request* newRequest(int oper, int client, char* sFilename, int editDim, char* fo
 
 // libera la memoria usata da una richiesta
 void destroyRequest(Request* req){
+	if(req == NULL){
+		return;
+	}
+	
 	free(req->sFileName);
 	free(req->forEdit);
 	free(req);

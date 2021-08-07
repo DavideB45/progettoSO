@@ -17,7 +17,7 @@ int fakeComp(const void* a,const void* b){
 /////////////////////////////////////// SERVER FILE ///////////////////////////////////////////
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
-ServerFile* newServerFile(int creator, int O_lock){
+ServerFile* newServerFile(int creator, int O_lock, char* nameP){
 	if(creator < 0){
 		//errore parametri
 		printf("creator < 0\n");
@@ -34,6 +34,7 @@ ServerFile* newServerFile(int creator, int O_lock){
 	}
 	
 	newFile->creator = creator;
+	newFile->namePath = nameP;
 	newFile->data = NULL;
 	newFile->dim = 0;
 	newFile->flagUse = 1;

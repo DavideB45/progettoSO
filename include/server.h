@@ -4,9 +4,14 @@
 #pragma once
 
 #include <FifoList.h>
+#include <files.h>
+#include <pthread.h>
 
 #define DEFAULT_SOCK_NAME "../mysock"
 #define UNIX_PATH_MAX 108
+
+#define FALSE 0
+#define TRUE 1
 
 // macro per informare il dispatcher della 
 // chiusura di un socket ricevuto sulla pipe
@@ -29,17 +34,24 @@ enum operResult{
 	NONE// indica operazioni che non riguardano un singolo file
 };
 
+typedef struct trhreadInfo{
+	pthread_mutex_t lock;// per accedere al filePtr
+	pthread_cond_t completedReq;// signal quando finisce l'operazione
+	ServerFile* filePtr;// su cosa opera
+}ThreadInfo;
+
 
 typedef struct ServerInfo{
-	char* sockName;
-	char* logName;
-	int sockFD;
+	char* sockName;// nome del socket
+	char* logName;// nome del file di log
+	int sockFD;// file descriptor del socket
 	int maxFileNum;
 	int maxFileDim;
-	int doneReq[2];
-	FifoList* toServe;
-	int serverStatus;
-	int n_worker;
+	int doneReq[2];// pipe per informare dispatcher
+	FifoList* toServe;// richieste dei client
+	int serverStatus;// per capire se deve chiudere
+	int n_worker;// totale thread worker
+	ThreadInfo* *threadUse;// array che dice cosa fanno i thread
 }ServerInfo;
 
 

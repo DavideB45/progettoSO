@@ -61,6 +61,7 @@ int TreeFileinsert(TreeFile* tree , TreeNode* newNode);
 
 // rimuove un nodo e ritorna il puntatore al file che conteneva
 // NULL -> non trovato/bad address
+// setta errno
 ServerFile* TreeFileRemove(TreeFile* tree, char* name);
 
 // trova e ritorna il file identificato con nome
