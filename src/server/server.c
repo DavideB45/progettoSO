@@ -23,8 +23,10 @@
 #define PERSONAL_LOCK_ACQUIRE   Pthread_mutex_lock( &(srvGen.threadUse[threadId]->lock) )
 #define PERSONAL_LOCK_RELEASE   Pthread_mutex_unlock( &(srvGen.threadUse[threadId]->lock) )
 #define PERSONAL_FILE_SET(fPtr) srvGen.threadUse[threadId]->filePtr = fPtr
-#define TREAD_LOCK_ACQUIRE(id)  Pthread_mutex_lock( &(srvGen.threadUse[id]->lock) )
-#define TREAD_LOCK_ACQUIRE(id)  Pthread_mutex_unlock( &(srvGen.threadUse[id]->lock) )
+#define PERSONAL_LOCK_SIGNAL	pthread_cond_signal( &(srvGen.threadUse[threadId]->completedReq )
+#define THREAD_LOCK_ACQUIRE(id)  Pthread_mutex_lock( &(srvGen.threadUse[id]->lock) )
+#define THREAD_LOCK_RELEASE(id)  Pthread_mutex_unlock( &(srvGen.threadUse[id]->lock) )
+#define THREAD_COND_WAIT(id)	pthread_cond_wait( &(srvGen.threadUse[id]->completedReq), &(srvGen.threadUse[id]->lock))
 #define THREAD_FILE_GET(id)     srvGen.threadUse[id]->filePtr
 
 #define PIPE_WRITE(client)  if( writen(srvGen.doneReq[1], &client, sizeof(int)) == -1){\
@@ -54,13 +56,10 @@ void manageRequest(Request* req, int threadId);
 // rorna 0 se fallisce
 // non effettua controlli sugli argomenti passati
 int tryUse(ServerFile* filePtr, Request* req, int closeOnFail);
-// indica che smette di usare il file
-// non effettua controlli sugli argomenti passati
-// non puo' essere implementata perche' il controllo deve guardare anche la coda
-// e' piu' semplice farlo nella funzione manage request
-void markAsFree(ServerFile* filePtr);
 // ritorna quando nessuno possiede un puntatore al file che voglio rimuovere
-void safeRemove(ServerFile* filePtr, int threadId);
+// da usare quando il file non e' piu' presente nell' albero
+// ritorna 0 se completa n>0 altrimenti
+int safeRemove(ServerFile* filePtr, int threadId);
 
 // chiude la connessione con il client
 int closeConnection(int client);
@@ -425,7 +424,6 @@ void manageRequest(Request* req, int threadId){
 				if(req->sFileName == NULL){
 					/* non c'e' spazio */
 					sendClientError(req->client, NO_MEMORY);
-					destroyRequest(req);
 					result = FAILED_STOP;
 				} else {
 					/* c'e' spazio */
@@ -435,7 +433,6 @@ void manageRequest(Request* req, int threadId){
 							/* non posso eseguire */
 							perror("Personal lock acquire");
 							sendClientError(req->client, UNKNOWN_ERROR);
-							destroyRequest(req);
 							result = FAILED_STOP;
 						} else {
 							filePtr = TreeFileFind(fileStorage, req->sFileName);
@@ -447,7 +444,6 @@ void manageRequest(Request* req, int threadId){
 								} else{
 									sendClientError(req->client, UNKNOWN_ERROR);
 								}
-								destroyRequest(req);
 								result = FAILED_STOP;
 							} else {
 								/* file trovato (eseguo la richiesta) */
@@ -515,18 +511,15 @@ void manageRequest(Request* req, int threadId){
 		}
 
 		if( filePtr != NULL && (result == FAILED_CONT || result == COMPLETED_CONT) ){
-			/* devo disfarmi della richiesta eseguita */
-			destroyRequest(req);
 			/* devo continuare a lavorare */
 			if( Pthread_mutex_lock( &(filePtr->lock) ) == -1){
 				perror("lockFile");
 				TreeFileRemove(fileStorage, req->sFileName);
 				//////////informa file di log////////////////////////////////////////////
-				destroyRequest(req);
 				result = FILE_DELETED;
 			} else {
-				req = generalListPop(filePtr->requestList);
-				if(req == NULL){
+				newReq = generalListPop(filePtr->requestList);
+				if(newReq == NULL){
 					/* ho finito le richieste residue */
 					filePtr->flagUse = 0;
 					if(result == FAILED_CONT){
@@ -534,32 +527,32 @@ void manageRequest(Request* req, int threadId){
 					} else {
 						result = COMPLETED_STOP;
 					}
-					
 				}
-				// pensare se togliere tutta la gestione dell' errore
-				if(Pthread_mutex_unlock( &(filePtr->lock) ) != 0){
-					// se non riesco a fare unlock gli altri non possono lasciarmi le loro 
-					// richieste quindi non possono chiamare signal quindi c'e' deadlock
-					perror("unlockFile");
-					TreeFileRemove(fileStorage, req->sFileName);
-					//////////informa file di log////////////////////////////////////////////
-					if(req != NULL){
-						sendClientFatalError(req->client, UNKNOWN_ERROR);
-						// si puo' evitare di mandare sempre errori fatali con un if/else
-						destroyRequest(req);
-					}
-					result = FILE_DELETED;
-				}
+				Pthread_mutex_unlock( &(filePtr->lock) );
+				destroyRequest(&req);
+				req = newReq;
 			}
 		}
 
 	}while( req != NULL && result != FAILED_CONT && result != COMPLETED_CONT );
 	
 	if(result == FILE_DELETED){
-		safeRemove(filePtr, threadId);
-		// posso eseguire come single thread
-		/* mi occupo di informare gli altri client*/
-		destroyServerFile(filePtr);
+		if(safeRemove(filePtr, threadId) != 0){
+			if( GET_OP(req->oper) == REMOVE_FILE){
+				sendClientError(req->client, UNKNOWN_ERROR);
+				destroyRequest(&req);
+			} else {
+				// devo rimuoverlo a causa di un errore
+				// termino?
+			}
+		} else{
+			/* mi occupo di informare gli altri client*/
+			while(req = generalListPop(filePtr->requestList), req != NULL){
+				/* code */
+			}
+			
+			destroyServerFile(filePtr);
+		}
 	}
 	/* gestire gli altri casi */
 	
@@ -634,7 +627,6 @@ int tryUse(ServerFile* filePtr, Request* req, int closeOnFail){
 			} else {
 				sendClientError(req->client, UNKNOWN_ERROR);
 			}
-			destroyRequest(req);
 		} else {
 			/* richiesta messa in coda */
 			Pthread_mutex_unlock(&(filePtr->lock));
@@ -647,4 +639,36 @@ int tryUse(ServerFile* filePtr, Request* req, int closeOnFail){
 		return 1;
 	}
 	
+}
+
+int safeRemove(ServerFile* filePtr, int threadId){
+	for(size_t i = 0; i < srvGen.n_worker; i++){
+		if(threadId != i){
+			if(THREAD_LOCK_ACQUIRE(i) != 0){
+				return i + 1;
+			}
+			while(filePtr == THREAD_FILE_GET(i)){
+				if(THREAD_COND_WAIT(i) != 0){
+					THREAD_LOCK_RELEASE(i);
+					return i + 1;
+				}
+			}
+			THREAD_LOCK_RELEASE(i);
+		}	
+	}
+	return 0;
+}
+
+
+int closeConnection(int client);
+int openFile(Request* req, ServerFile* filePtr);
+int readFile(Request* req, ServerFile* filePtr);
+int readNFiles(Request* req);
+int writeFile(Request* req, ServerFile* filePtr);
+int appendToFile(Request* req, ServerFile* filePtr);
+int lockFileW(Request* req, ServerFile* filePtr);
+int unlockFileW(Request* req, ServerFile* filePtr);
+int closeFile(Request* req, ServerFile* filePtr);
+int removeFile(Request* req, ServerFile* filePtr){
+
 }

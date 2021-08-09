@@ -27,59 +27,66 @@ int main(void){
 	}
 	printf("\n");
 	read_config("./servWork/file_config");
+	
+	Request* test = NULL;
+	printf("%x\n", test);
+	test = newRequest(3, 3, NULL, 0, NULL);
+	printf("%x\n", test);
+	destroyRequest(&test);
+	printf("%x\n", test);
 
-	unsigned int operazione;
-	SET_CLEAN(operazione);
-	SET_OP(operazione, LOCK_FILE);
-	SET_O_CREATE(operazione);
-	SET_O_NON_BLOCK(operazione);
-	SET_DIR_SAVE(operazione);
+	// unsigned int operazione;
+	// SET_CLEAN(operazione);
+	// SET_OP(operazione, LOCK_FILE);
+	// SET_O_CREATE(operazione);
+	// SET_O_NON_BLOCK(operazione);
+	// SET_DIR_SAVE(operazione);
 
-	SET_PATH_DIM(operazione, 300);
+	// SET_PATH_DIM(operazione, 300);
 
-	printf("%u\n", GET_OP(operazione));
-	printf("%u\n", GET_O_CREATE(operazione));
-	printf("%u\n", GET_O_LOCK(operazione));
-	printf("%u\n", GET_DIR_SAVE(operazione));
-	printf("%u\n", GET_COMP_PATH(operazione));
-	printf("%u\n", GET_O_NON_BLOCK(operazione));
-	printf("%u\n", GET_PATH_DIM(operazione));
+	// printf("%u\n", GET_OP(operazione));
+	// printf("%u\n", GET_O_CREATE(operazione));
+	// printf("%u\n", GET_O_LOCK(operazione));
+	// printf("%u\n", GET_DIR_SAVE(operazione));
+	// printf("%u\n", GET_COMP_PATH(operazione));
+	// printf("%u\n", GET_O_NON_BLOCK(operazione));
+	// printf("%u\n", GET_PATH_DIM(operazione));
 
-	switch(GET_OP(operazione)){
-	case CLOSE_CONNECTION:
-		printf("CLOSE_CONNECTION\n");
-	break;
-	case OPEN_FILE:
-		printf("OPEN_FILE\n");
-	break;
-	case READ_FILE:
-		printf("READ_FILE\n");
-	break;
-	case READ_N_FILES:
-		printf("READ_N_FILES\n");
-	break;
-	case WRITE_FILE:
-		printf("WRITE_FILE\n");
-	break;
-	case APPEND_TO_FILE:
-		printf("APPEND_TO_FILE\n");
-	break;
-	case LOCK_FILE:
-		printf("LOCK_FILE\n");
-	break;
-	case UNLOCK_FILE:
-		printf("UNLOCK_FILE\n");
-	break;
-	case CLOSE_FILE:
-		printf("CLOSE_FILE\n");
-	break;
-	case REMOVE_FILE:
-		printf("REMOVE_FILE\n");
-	break;
-	default:
-		printf("operazione sconosciuta\n");
-	break;
-	}
+	// switch(GET_OP(operazione)){
+	// case CLOSE_CONNECTION:
+	// 	printf("CLOSE_CONNECTION\n");
+	// break;
+	// case OPEN_FILE:
+	// 	printf("OPEN_FILE\n");
+	// break;
+	// case READ_FILE:
+	// 	printf("READ_FILE\n");
+	// break;
+	// case READ_N_FILES:
+	// 	printf("READ_N_FILES\n");
+	// break;
+	// case WRITE_FILE:
+	// 	printf("WRITE_FILE\n");
+	// break;
+	// case APPEND_TO_FILE:
+	// 	printf("APPEND_TO_FILE\n");
+	// break;
+	// case LOCK_FILE:
+	// 	printf("LOCK_FILE\n");
+	// break;
+	// case UNLOCK_FILE:
+	// 	printf("UNLOCK_FILE\n");
+	// break;
+	// case CLOSE_FILE:
+	// 	printf("CLOSE_FILE\n");
+	// break;
+	// case REMOVE_FILE:
+	// 	printf("REMOVE_FILE\n");
+	// break;
+	// default:
+	// 	printf("operazione sconosciuta\n");
+	// break;
+	// }
 
 	// CLOSE_CONNECTION, 
 	// OPEN_FILE, 

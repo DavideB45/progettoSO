@@ -31,6 +31,7 @@ enum operResult{
 	FAILED_STOP,// DELAIED  MISSING_FILE
 	COMPLETED_STOP,// LOCK
 	FILE_DELETED,// file cancellato dall'op, il worker informa altre richieste
+	DELAYED,
 	NONE// indica operazioni che non riguardano un singolo file
 };
 

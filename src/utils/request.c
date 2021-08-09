@@ -7,7 +7,7 @@
 Request* newRequest(int oper, int client, char* sFilename, int editDim, char* forEdit){
 	Request* req = malloc(sizeof(Request));
 	if(req == NULL){
-		perror(malloc);
+		perror("malloc request");
 		return NULL;
 	}
 	req->oper = oper;
@@ -20,13 +20,13 @@ Request* newRequest(int oper, int client, char* sFilename, int editDim, char* fo
 }
 
 // libera la memoria usata da una richiesta
-void destroyRequest(Request* req){
-	if(req == NULL){
+void destroyRequest(Request** req){
+	if(req == NULL || *req == NULL){
 		return;
 	}
 	
-	free(req->sFileName);
-	free(req->forEdit);
-	free(req);
-	req = NULL;
+	free((*req)->sFileName);
+	free((*req)->forEdit);
+	free(*req);
+	*req = NULL;
 }

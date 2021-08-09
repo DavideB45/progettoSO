@@ -17,14 +17,14 @@ enum operat {
 };
 
 enum servErrorRet {
-	IMPOSSIBLE_READ,
-	NO_OP_SUPPORT,
-	INVALID_DIM,
-	NO_SUCH_FILE,
-	NO_OP_SUPPORT,
-	NO_MEMORY,
-	UNKNOWN_ERROR,
-	UNKNOWN_ERROR_F
+	IMPOSSIBLE_READ,// fatale
+	NO_OP_SUPPORT,// fatale
+	INVALID_DIM,// fatale
+	NO_MEMORY,// fatale
+	NO_SUCH_FILE_F,// fatale
+	UNKNOWN_ERROR_F,// fatale
+	NO_SUCH_FILE,// non fatale
+	UNKNOWN_ERROR// non fatale
 };
 
 
@@ -80,6 +80,7 @@ typedef struct Request{
 Request* newRequest(int oper, int client, char* sFilename, int editDim, char* forEdit);
 
 // libera la memoria usata da una richiesta
-void destroyRequest(Request* req);
+// e mette a NULL il puntatore?
+void destroyRequest(Request** req);
 
 #endif
