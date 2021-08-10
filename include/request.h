@@ -17,6 +17,7 @@ enum operat {
 };
 
 enum servErrorRet {
+	SUCCESS,// operazione completata
 	IMPOSSIBLE_READ,// fatale
 	NO_OP_SUPPORT,// fatale
 	INVALID_DIM,// fatale
@@ -62,6 +63,7 @@ enum servErrorRet {
 #define GET_O_NON_BLOCK(x) (x & (1 << 22)) == (1 << 22)
 
 // scrive la dimensione del nome del file
+// non conta lo '\0'
 #define SET_PATH_DIM(x, dim) x = x | (dim)
 #define GET_PATH_DIM(x) x & 0x003fffff
 
@@ -71,7 +73,7 @@ typedef struct Request{
 	int oper;
 	int client;
 	char* sFileName;
-	int editDim;
+	int editDim;// non contiene '\0'
 	char* forEdit;//da usare es per append
 }Request;
 

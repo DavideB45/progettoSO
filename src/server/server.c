@@ -23,14 +23,15 @@
 #define PERSONAL_LOCK_ACQUIRE   Pthread_mutex_lock( &(srvGen.threadUse[threadId]->lock) )
 #define PERSONAL_LOCK_RELEASE   Pthread_mutex_unlock( &(srvGen.threadUse[threadId]->lock) )
 #define PERSONAL_FILE_SET(fPtr) srvGen.threadUse[threadId]->filePtr = fPtr
-#define PERSONAL_LOCK_SIGNAL	pthread_cond_signal( &(srvGen.threadUse[threadId]->completedReq )
-#define THREAD_LOCK_ACQUIRE(id)  Pthread_mutex_lock( &(srvGen.threadUse[id]->lock) )
-#define THREAD_LOCK_RELEASE(id)  Pthread_mutex_unlock( &(srvGen.threadUse[id]->lock) )
+#define PERSONAL_FILE_GET		srvGen.threadUse[threadId]->filePtr
+#define PERSONAL_LOCK_SIGNAL	pthread_cond_signal( &(srvGen.threadUse[threadId]->completedReq) )
+#define THREAD_LOCK_ACQUIRE(id) Pthread_mutex_lock( &(srvGen.threadUse[id]->lock) )
+#define THREAD_LOCK_RELEASE(id) Pthread_mutex_unlock( &(srvGen.threadUse[id]->lock) )
 #define THREAD_COND_WAIT(id)	pthread_cond_wait( &(srvGen.threadUse[id]->completedReq), &(srvGen.threadUse[id]->lock))
 #define THREAD_FILE_GET(id)     srvGen.threadUse[id]->filePtr
 
 #define PIPE_WRITE(client)  if( writen(srvGen.doneReq[1], &client, sizeof(int)) == -1){\
-								perror("writen");\
+								perror("writenPipe");\
 								exit(EXIT_FAILURE);\
 							}
 
@@ -52,7 +53,7 @@ void* worker(void*);
 // esegue una richiesta
 void manageRequest(Request* req, int threadId);
 // setta il flag in use di un file
-// torna 1 se successo
+// torna 1 se successo e le operazioni possono essere svolte senza lock
 // rorna 0 se fallisce
 // non effettua controlli sugli argomenti passati
 int tryUse(ServerFile* filePtr, Request* req, int closeOnFail);
@@ -60,6 +61,9 @@ int tryUse(ServerFile* filePtr, Request* req, int closeOnFail);
 // da usare quando il file non e' piu' presente nell' albero
 // ritorna 0 se completa n>0 altrimenti
 int safeRemove(ServerFile* filePtr, int threadId);
+// ritorna 1 se il file puo' essere usato da un client
+// ritorna 0 se il file e' lockato da un altro client 
+int fileUsePermitted(int client, ServerFile* filePtr);
 
 // chiude la connessione con il client
 int closeConnection(int client);
@@ -87,6 +91,11 @@ int removeFile(Request* req, ServerFile* filePtr);
 // legge da un socket e lo chiude in caso di fallimento di readn
 // informa il dispatcher
 int readFormSocket(int sock, void* buff, int dim);
+// invia al client il risultato dell' operazione
+// in caso di successo ritorna 0
+// in caso di fallimento chiude il socket e ritorna -1
+// dim include '\0' se presente
+int sendClientResult(int client, void* reply, int dim);
 // invia al client errori che non chiudono la connessione
 // in caso di fallimento di writen il socket viene chiuso
 void sendClientError(int sock, int err);
@@ -408,6 +417,7 @@ void manageRequest(Request* req, int threadId){
 	Request* newReq = NULL;
 	enum operResult result = NONE;
 	int buffInt = 0;
+	char* buffGeneric = NULL;
 	do{
 		switch(GET_OP(req->oper)){
 		case CLOSE_CONNECTION:
@@ -543,21 +553,78 @@ void manageRequest(Request* req, int threadId){
 				destroyRequest(&req);
 			} else {
 				// devo rimuoverlo a causa di un errore
-				// termino?
+				// il problema non e' nel file ma nella mutua esclusione dei thread
+				// ho incontrato 2 errori in poco tempo => termino
+				printf("safeRemove\n");
+				exit(EXIT_FAILURE);
 			}
 		} else{
 			/* mi occupo di informare gli altri client*/
+			int op;
 			while(req = generalListPop(filePtr->requestList), req != NULL){
-				/* code */
+				op = GET_OP(req->oper);
+				// NOTA : sono presenti solo le operazioni che possono finire nella coda del file
+				if(op == REMOVE_FILE || op == CLOSE_FILE){
+					buffInt = SUCCESS;
+					sendClientResult(req->client, &buffInt, sizeof(int));
+				} else {
+				if(op == OPEN_FILE || op == READ_FILE || op == LOCK_FILE || op == UNLOCK_FILE){
+					/* operazione fallita, non serve pulire il socket */
+					sendClientError(req->client, NO_SUCH_FILE);
+				}
+				else {
+				if(op == APPEND_TO_FILE){
+					/* operazione fallita, devo pulire il socket */
+					if(readFormSocket(req->client, &(req->editDim), sizeof(int)) == 0){
+						req->forEdit = malloc(req->editDim + 1);
+						if(req->forEdit == NULL){
+							sendClientFatalError(req->client, IMPOSSIBLE_READ);
+						} else {
+							if(readFormSocket(req->client, req->forEdit, req->editDim + 1) == 0){
+								sendClientFatalError(req->client, IMPOSSIBLE_READ);
+							}
+						}
+					}
+				} else {
+					printf("operazione nel posto sbagliato\n");
+					printf("clinet %d, operazione %d\n", req->client, op);
+				}
+				}
+				}
+				destroyRequest(req);
 			}
-			
 			destroyServerFile(filePtr);
 		}
 	}
-	/* gestire gli altri casi */
 	
-	/* mettere NULL come file che sto gestendo */
+	if(PERSONAL_LOCK_ACQUIRE != 0){
+		exit(EXIT_FAILURE);
+	}
+	if(PERSONAL_FILE_GET != NULL){
+		filePtr = PERSONAL_FILE_GET;
+		PERSONAL_FILE_SET(NULL);
+		if(PERSONAL_LOCK_SIGNAL != 0){
+			// nessuno usava quel file posso continuare
+			for(size_t i = 0; i < srvGen.n_worker; i++){
+				if(i != threadId){
+					if(THREAD_LOCK_ACQUIRE(i) != 0){
+						perror("mutex acquire file release");
+						exit(EXIT_FAILURE);
+					}
+					if(THREAD_FILE_GET(i) == filePtr){
+						// qualcuno usa quel file e non posso
+						perror("file no signaled");
+						exit(EXIT_FAILURE);
+					}
+					THREAD_LOCK_RELEASE(i);
+				}
+			}
+		}
+	}
+	PERSONAL_LOCK_RELEASE;
 }
+
+
 
 
 int readFormSocket(int sock, void* buff, int dim){
@@ -570,18 +637,28 @@ int readFormSocket(int sock, void* buff, int dim){
 		buffInt = sock;
 		CONN_MARK(buffInt, NOT_CONNECTED);
 		PIPE_WRITE(buffInt);
-		return 0;
+		return -1;
 	break;
 	case 0:
 		/* client chiuso EOF */
 		buffInt = sock;
 		CONN_MARK(buffInt, NOT_CONNECTED);
 		PIPE_WRITE(buffInt);
-		return 0;
+		return -1;
 	break;
 	default:
-		return 1;
+		return 0;
 	break;
+	}
+}
+
+int sendClientResult(int client, void* reply, int dim){
+	if(writen(client, reply, dim) != 1){
+		CONN_MARK(client, NOT_CONNECTED);
+		PIPE_WRITE(client);
+		return -1;
+	} else {
+		return 0;
 	}
 }
 
@@ -608,6 +685,8 @@ void sendClientFatalError(int sock, int err){
 	PIPE_WRITE(buffInt);
 }
 
+
+
 int tryUse(ServerFile* filePtr, Request* req, int closeOnFail){
 	
 	if( Pthread_mutex_lock( &(filePtr->lock)) != 0){
@@ -618,7 +697,7 @@ int tryUse(ServerFile* filePtr, Request* req, int closeOnFail){
 		}
 		return 0;
 	}
-	if(filePtr->flagUse){
+	if(filePtr->flagUse || !fileUsePermitted(req->client, filePtr) ){
 		if( generalListInsert(filePtr->requestList, req) == 0){
 			/* operazione fallita (non ho messo in coda) */
 			Pthread_mutex_unlock(&(filePtr->lock));
@@ -659,7 +738,15 @@ int safeRemove(ServerFile* filePtr, int threadId){
 	return 0;
 }
 
+int fileUsePermitted(int client, ServerFile* filePtr){
+	return filePtr->flagO_lock == 0 || filePtr->lockOwner == client;
+}
 
+		// preparo la prossima operazione
+		// se il file e' loked non devo 
+		// se sono il possessore della lock dopo la mia operazione il thread deve smettere
+		// usare 'completed_stop' o come si chiama quando eseguo un' operazione
+		// in mutua esclusione
 int closeConnection(int client);
 int openFile(Request* req, ServerFile* filePtr);
 int readFile(Request* req, ServerFile* filePtr);
