@@ -68,7 +68,7 @@ int fileUsePermitted(int client, ServerFile* filePtr);
 // chiude la connessione con il client
 int closeConnection(int client);
 // apre un file (open = intero che definisce opzioni)
-int openFile(Request* req, ServerFile* filePtr);
+int openFile(Request* req, ServerFile** filePtrP);
 // scrive al client il contenuto del file
 int readFile(Request* req, ServerFile* filePtr);
 // scrive al client il contenuto di N files
@@ -111,8 +111,9 @@ int main(int argc, char* argv[]){
 	if(initServer() != 0){
 		return 1;
 	}
-	
-
+printf("avvio il dispatcher\n");
+	dispatcher();
+printf("sono tornato dal dispatcher\n");
 
 	
 
@@ -128,7 +129,13 @@ int initServer(void){
 		perror("pipe");
 		exit(1);
 	}
-
+printf("pipe creata\n");//////////////////////////////////////////////////////////////////////////
+	
+	srvGen.toServe = newList();
+	if(srvGen.toServe == NULL){
+		exit(EXIT_FAILURE);
+	}
+	
 	unlink(srvGen.sockName);
 	SOCKET(SOCKET_FD);
 
@@ -146,12 +153,13 @@ int initServer(void){
 	}
 	//tiene un po' di persone in coda per non rifiuare 
 	//se il server non e' subito pronto ad accettarle
+printf("bind fatta\n");/////////////////////////////////////////////////////////////////////////////
 	if(listen(SOCKET_FD,SOMAXCONN)){
 		perror("listen");
 		exit(1);
 	}
 
-
+printf("listen fatta\n");/////////////////////////////////////////////////////////////////////////////
 
 	return 0;
 }
@@ -167,10 +175,12 @@ void* dispatcher(void){
 	fd_set rdSet;
 	FD_ZERO(&set);
 	FD_SET(SOCKET_FD, &set);
-
+printf("inizializzato il set con %d\n", SOCKET_FD);///////////////////////////////////////////
+	srvGen.serverStatus = S_WORKING;
 	while(srvGen.serverStatus == S_WORKING){
 		rdSet = set;
 		// se qualcosa non funziona con le interruzioni provare pselect
+printf("inizio select\n");/////////////////////////////////////////////////////////////////////////
 		nReady = select(maxFD + 1, &rdSet, NULL, NULL, NULL);
 		if(nReady == -1){
 			/* SELECT ERROR */
@@ -216,6 +226,7 @@ void* dispatcher(void){
 							close(newConn);
 						} else {
 							/* METTO NUOVO CLIENT NELLA MASCHERA */
+							printf("NUOVA CONNESSIONE %d\n", newConn);
 							if(maxFD < newConn)
 								maxFD = newConn;
 							FD_SET(newConn, &set);
@@ -276,7 +287,7 @@ void* dispatcher(void){
 		}
 		
 	}	
-	
+	return NULL;
 }
 
 void readConfig(char* indirizzo){
@@ -387,7 +398,9 @@ int updatemax(fd_set set, int maxFD){
 void* worker(void* idThread){
 	int threadId = *((int*) idThread);
 	int* readSocK;
-	readSocK = (int*) pop(&(srvGen.toServe));
+	while (1){
+	
+	readSocK = (int*) pop( srvGen.toServe );
 	if(readSocK == NULL){
 		pthread_exit(NULL);
 	} else {
@@ -403,13 +416,14 @@ void* worker(void* idThread){
 			CONN_MARK(clId, NOT_CONNECTED);
 			PIPE_WRITE(clId)
 		break;
-		default:
+		default:;
 			Request* req = newRequest(oper, clId, NULL, 0, NULL);
 			manageRequest(req, threadId);
 		break;
 		}
 	} 
 	
+	}
 }
 
 void manageRequest(Request* req, int threadId){
@@ -417,7 +431,6 @@ void manageRequest(Request* req, int threadId){
 	Request* newReq = NULL;
 	enum operResult result = NONE;
 	int buffInt = 0;
-	char* buffGeneric = NULL;
 	do{
 		switch(GET_OP(req->oper)){
 		case CLOSE_CONNECTION:
@@ -433,7 +446,7 @@ void manageRequest(Request* req, int threadId){
 				req->sFileName = malloc(dim + 1);
 				if(req->sFileName == NULL){
 					/* non c'e' spazio */
-					sendClientError(req->client, NO_MEMORY);
+					sendClientFatalError(req->client, NO_MEMORY);
 					result = FAILED_STOP;
 				} else {
 					/* c'e' spazio */
@@ -446,21 +459,19 @@ void manageRequest(Request* req, int threadId){
 							result = FAILED_STOP;
 						} else {
 							filePtr = TreeFileFind(fileStorage, req->sFileName);
+							if(errno != 0){
+								sendClientError(req->client, UNKNOWN_ERROR);
+							}
+							PERSONAL_FILE_SET(filePtr);
+							PERSONAL_LOCK_RELEASE;
+
 							if(filePtr == NULL){
-								PERSONAL_LOCK_RELEASE;
-								/* file non trovato */
-								if(errno == 0){
-									sendClientError(req->client, NO_SUCH_FILE);
-								} else{
-									sendClientError(req->client, UNKNOWN_ERROR);
-								}
-								result = FAILED_STOP;
+								/* file non trovato forse lo creo*/
+								result = openFile(req, &filePtr);
 							} else {
 								/* file trovato (eseguo la richiesta) */
-								PERSONAL_FILE_SET(filePtr);
-								PERSONAL_LOCK_RELEASE;
 								if(tryUse(filePtr, req, FALSE)){
-									result = openFile(req, filePtr);
+									result = openFile(req, &filePtr);
 								} else {
 									result = FAILED_STOP;
 								}
@@ -479,7 +490,7 @@ void manageRequest(Request* req, int threadId){
 					era stata gia' trovata da un altro client in precedenza
 					quindi e' stata rimossa dalla lista di richieste del file */
 			} else {
-				result = openFile(req, filePtr);
+				result = openFile(req, &filePtr);
 			}
 			
 		break;
@@ -591,7 +602,7 @@ void manageRequest(Request* req, int threadId){
 				}
 				}
 				}
-				destroyRequest(req);
+				destroyRequest(&req);
 			}
 			destroyServerFile(filePtr);
 		}
@@ -698,7 +709,7 @@ int tryUse(ServerFile* filePtr, Request* req, int closeOnFail){
 		return 0;
 	}
 	if(filePtr->flagUse || !fileUsePermitted(req->client, filePtr) ){
-		if( generalListInsert(filePtr->requestList, req) == 0){
+		if( generalListInsert(req, filePtr->requestList) == 0){
 			/* operazione fallita (non ho messo in coda) */
 			Pthread_mutex_unlock(&(filePtr->lock));
 			if(closeOnFail){
@@ -747,15 +758,107 @@ int fileUsePermitted(int client, ServerFile* filePtr){
 		// se sono il possessore della lock dopo la mia operazione il thread deve smettere
 		// usare 'completed_stop' o come si chiama quando eseguo un' operazione
 		// in mutua esclusione
-int closeConnection(int client);
-int openFile(Request* req, ServerFile* filePtr);
-int readFile(Request* req, ServerFile* filePtr);
-int readNFiles(Request* req);
-int writeFile(Request* req, ServerFile* filePtr);
-int appendToFile(Request* req, ServerFile* filePtr);
-int lockFileW(Request* req, ServerFile* filePtr);
-int unlockFileW(Request* req, ServerFile* filePtr);
-int closeFile(Request* req, ServerFile* filePtr);
-int removeFile(Request* req, ServerFile* filePtr){
+int closeConnection(int client){
+	return FAILED_STOP;
+}
 
+int openFile(Request* req, ServerFile** filePtrP){
+	ServerFile* filePtr = *filePtrP;
+	// esiste ma lo voglio creare
+	if(filePtrP != NULL && GET_O_CREATE(req->oper)){
+		sendClientError(req->client, FILE_ALREADY_EXISTS);
+		return FAILED_STOP;
+	}
+	// non esiste e non ho messo O_Create
+	if(filePtr == NULL && !GET_O_CREATE(req->oper)){
+		sendClientError(req->client, NO_SUCH_FILE);
+		return FAILED_STOP;
+	}
+	// non esiste ma ho messo O_Create => creo
+	if(filePtr == NULL && GET_O_CREATE(req->oper)){
+		filePtr = newServerFile(req->client, GET_O_LOCK(req->oper), req->sFileName);
+		if(filePtr == NULL){
+			if(errno == ENOMEM){
+				sendClientFatalError(req->client, NO_MEMORY);
+			} else {
+				sendClientError(req->client, UNKNOWN_ERROR);
+			}
+			return FAILED_STOP;
+		}
+		/* metto in albero */
+		TreeNode* toInsert = newTreeNode(filePtr, req->sFileName);
+		if(toInsert == NULL){
+			sendClientFatalError(req->client, NO_MEMORY);
+			destroyServerFile(filePtr);
+			return FAILED_STOP;
+		}
+		switch( TreeFileinsert(fileStorage, toInsert) ){
+		case 0:
+			sendClientError(req->client, FILE_ALREADY_EXISTS);
+			destroyTreeNode(toInsert);
+			destroyServerFile(filePtr);
+			return FAILED_STOP;
+		break;
+		case 1:;
+			int res = SUCCESS;
+			sendClientResult(req->client, &res, sizeof(int));
+			req->sFileName = NULL;// evito di distruggere il nome
+			// controllare se il puntatore e' settato correttamente
+			*filePtrP = filePtr;
+			return COMPLETED_CONT;
+		break;
+		default:
+			sendClientError(req->client, UNKNOWN_ERROR);
+			destroyTreeNode(toInsert);
+			destroyServerFile(filePtr);
+			return FAILED_STOP;
+		break;
+		}
+	}
+	// il file va solo aperto
+	int* client_ = malloc(sizeof(int));
+	if(client_ == NULL){
+		sendClientFatalError(req->client, NO_MEMORY);
+		return FAILED_CONT;
+	}
+	*client_ = req->client;
+	if(generalListInsert( (void* ) client_, filePtr->openList) == 0){
+		if(errno == ENOMEM){
+			sendClientFatalError(req->client, NO_MEMORY);
+		} else {
+			sendClientError(req->client, UNKNOWN_ERROR);
+		}
+		free(client_);
+		return FAILED_CONT;
+	}
+
+	int reply = SUCCESS;
+	sendClientResult(req->client, &reply, sizeof(int));
+	return COMPLETED_CONT;
+	
+}
+
+int readFile(Request* req, ServerFile* filePtr){
+	return FAILED_STOP;
+}
+int readNFiles(Request* req){
+	return FAILED_STOP;
+}
+int writeFile(Request* req, ServerFile* filePtr){
+	return FAILED_STOP;
+}
+int appendToFile(Request* req, ServerFile* filePtr){
+	return FAILED_STOP;
+}
+int lockFileW(Request* req, ServerFile* filePtr){
+	return FAILED_STOP;
+}
+int unlockFileW(Request* req, ServerFile* filePtr){
+	return FAILED_STOP;
+}
+int closeFile(Request* req, ServerFile* filePtr){
+	return FAILED_STOP;
+}
+int removeFile(Request* req, ServerFile* filePtr){
+	return FAILED_STOP;
 }

@@ -30,6 +30,7 @@ ServerFile* newServerFile(int creator, int O_lock, char* nameP){
 	if(newFile == NULL){
 		//non ho creato newFile
 		perror("mallock ServerFile");
+		errno = ENOMEM;
 		return NULL;
 	}
 	
@@ -49,6 +50,7 @@ ServerFile* newServerFile(int creator, int O_lock, char* nameP){
 	
 	if( Pthread_mutex_init( &(newFile->lock) ) != 0){
 		free(newFile);
+		errno = EPERM;
 		return NULL;
 	}
 	
@@ -57,6 +59,7 @@ ServerFile* newServerFile(int creator, int O_lock, char* nameP){
 		//non ho creato openList
 		pthread_mutex_destroy( &(newFile->lock) );
 		free(newFile);
+		errno = ENOMEM;
 		return NULL;
 	}
 	int* newOpen = malloc(sizeof(int));
@@ -64,6 +67,7 @@ ServerFile* newServerFile(int creator, int O_lock, char* nameP){
 		generalListDestroy(newFile->openList);
 		pthread_mutex_destroy( &(newFile->lock) );
 		free(newFile);
+		errno = ENOMEM;
 		return NULL;
 	}
 	
@@ -77,9 +81,10 @@ ServerFile* newServerFile(int creator, int O_lock, char* nameP){
 		pthread_mutex_destroy( &(newFile->lock) );
 		free(newFile);
 		generalListDestroy(newFile->openList);
+		errno = ENOMEM;
 		return NULL;
 	}	
-
+	errno = 0;
 	return newFile;
 }
 

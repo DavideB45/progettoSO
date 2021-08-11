@@ -10,6 +10,9 @@
 #include <unistd.h>
 #include <utils.h>
 #include <api.h>
+// base
+#include <time.h>
+
 
 int sock;
 //connect to the server
@@ -20,16 +23,17 @@ int openConnection(const char* sockname, int msec, const struct timespec abstime
 	SOCKET(sock);
 
 	struct sockaddr_un sa;
-	strncpy(sa.sun_path, SOCKNAME, UNIX_PATH_MAX);
+	strncpy(sa.sun_path, sockname, UNIX_PATH_MAX);
 	sa.sun_family=AF_UNIX;
 
 	// va gestita con dei cicli
 	// i timer vanno resettati
+	
 	while(connect(sock,(struct sockaddr*) &sa, sizeof(sa)) == -1){
-		if (errno = ENOENT){
-			//aspetta msec 
-			
-			//controlla se abstime e' finito oppure usare un segnale
+		if (errno == ENOENT){
+			// aspetta msec 
+			printf("enoent\n");
+			// controlla se abstime e' finito oppure usare un segnale
 			if(1){
 				;
 			}
@@ -37,14 +41,11 @@ int openConnection(const char* sockname, int msec, const struct timespec abstime
 			return -1;
 		}
 	}
-	
+	printf("connesso\n");
+	return 1;
 }
 
 int closeConnection(){
 	sock = 0;
-}
-
-int main(void){
-	printf("compila\n");
 	return 0;
 }

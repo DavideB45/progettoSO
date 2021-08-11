@@ -1,5 +1,5 @@
-#ifndef API_H
-#define API_H
+#ifndef CLIENT_H
+#define CLIENT_H
 
 #pragma once
 

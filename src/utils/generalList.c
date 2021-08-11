@@ -87,6 +87,7 @@ _Bool generalListInsert(void *elem, GeneralList* list){
 	GeneralListNode* newNode = malloc(sizeof(GeneralListNode));
 	if(newNode == NULL){
 		perror("malloc list node");
+		errno = ENOMEM;
 		return 0;
 	}
 
@@ -96,6 +97,7 @@ _Bool generalListInsert(void *elem, GeneralList* list){
 		list->queue = newNode;
 		list->head->nextPtr = NULL;
 		list->head->elem = elem;
+		errno = 0;
 		return 1;
 	}
 	
@@ -103,6 +105,7 @@ _Bool generalListInsert(void *elem, GeneralList* list){
 	newNode->elem = elem;
 	list->queue->nextPtr = newNode;
 	list->queue = newNode;
+	errno = 0;
 	return 1;
 }
 

@@ -7,6 +7,7 @@
 // #include "../../include/tree.h"
 #include <files.h>
 #include <tree.h>
+#include <utils.h>
 #include <pthread.h>
 
 //miltiple reader
@@ -291,6 +292,7 @@ TreeNode* newTreeNode(ServerFile* sFile, char* name){
 	TreeNode* newNode = malloc(sizeof(TreeNode));
 	if(newNode == NULL){
 		perror("new tree node");
+		errno = ENOMEM;
 		return NULL;
 	}
 	if(sFile != NULL){
@@ -307,6 +309,7 @@ TreeNode* newTreeNode(ServerFile* sFile, char* name){
 	if(newNode->name == NULL){
 		perror("no space for name");
 		free(newNode);
+		errno = ENOMEM;
 		return NULL;
 	}
 	newNode->name = strcpy(newNode->name, name);

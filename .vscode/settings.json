@@ -5,6 +5,7 @@
 		"stdio.h": "c",
 		"utils.h": "c",
 		"un.h": "c",
-		"server.h": "c"
+		"server.h": "c",
+		"types.h": "c"
 	}
 }
