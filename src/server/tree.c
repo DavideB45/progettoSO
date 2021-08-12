@@ -225,25 +225,6 @@ ServerFile* TreeFileRemove(TreeFile* tree, char* name){
 	return toRet;
 }
 
-//non funziona correttamente se chiamata direttamente
-// static ServerFile* noMutexFind(TreeNode* root, char* name){
-// 	if(root == NULL){
-// 		return NULL;
-// 	}
-// 	int compare = strcmp(root->name, name);
-// 	if(compare < 0){
-// 		return noMutexFind(root->rightPtr, name);
-// 	}
-// 	if(compare > 0){
-// 		return noMutexFind(root->leftPtr, name);
-// 	}
-// 	if(root->flagReal == 0){
-// 		return NULL;
-// 	} else {
-// 		return root->sFile;;
-// 	}
-// }
-
 //find stub
 //NULL = invalid argument/ not found
 ServerFile* TreeFileFind(TreeFile* tree, char* name){
@@ -296,10 +277,11 @@ TreeNode* newTreeNode(ServerFile* sFile, char* name){
 		return NULL;
 	}
 	if(sFile != NULL){
-		newNode->flagReal = 0;
+		newNode->flagReal = 1;
 		newNode->sFile = sFile;
 	} else {
 		newNode->sFile = NULL;
+		newNode->flagReal = 0;
 		// newNode->useLRU = NULL;
 	}
 	newNode->leftPtr = NULL;

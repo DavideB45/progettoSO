@@ -560,7 +560,7 @@ void manageRequest(Request* req, int threadId){
 			printf("operazione sconosciuta\n");
 		break;
 		}
-	printf("%d : filePtr = %x\n", threadId, filePtr);///////////////////////////////////////
+	printf("%d : filePtr = %p\n", threadId, (void*)filePtr);///////////////////////////////////////
 		if( filePtr != NULL && (result == FAILED_CONT || result == COMPLETED_CONT) ){
 			/* devo continuare a lavorare */
 			if( Pthread_mutex_lock( &(filePtr->lock) ) == -1){
@@ -840,8 +840,10 @@ int openFile(Request* req, ServerFile** filePtrP){
 			int res = SUCCESS;
 			sendClientResult(req->client, &res, sizeof(int));
 			req->sFileName = NULL;// evito di distruggere il nome
-			// controllare se il puntatore e' settato correttamente
 			*filePtrP = filePtr;
+			if(GET_O_LOCK(req->oper)){
+				return COMPLETED_STOP;
+			}
 			return COMPLETED_CONT;
 		break;
 		default:
@@ -887,8 +889,15 @@ int openFile(Request* req, ServerFile** filePtrP){
 		return COMPLETED_STOP;
 	}
 	
-		
 	int reply = SUCCESS;
+	if(filePtr->flagO_lock == 1){
+		Pthread_mutex_lock( &(filePtr->lock) );///////non so come gestire un errore (rimuovere file?)
+		filePtr->flagUse = 0;
+		Pthread_mutex_unlock( &(filePtr->lock) );
+		sendClientResult(req->client, &reply, sizeof(int));
+		return COMPLETED_STOP;
+	}
+
 	sendClientResult(req->client, &reply, sizeof(int));
 	return COMPLETED_CONT;
 	

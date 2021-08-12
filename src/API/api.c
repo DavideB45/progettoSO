@@ -47,6 +47,7 @@ int openConnection(const char* sockname, int msec, const struct timespec abstime
 }
 
 // non gestisce le espulsioni
+// non controlla gli errori
 int openFile(const char* pathname, int flags){
 	char* request;
 	int sizeofReq = 0;

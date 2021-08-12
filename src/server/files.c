@@ -38,14 +38,17 @@ ServerFile* newServerFile(int creator, int O_lock, char* nameP){
 	newFile->namePath = nameP;
 	newFile->data = NULL;
 	newFile->dim = 0;
-	newFile->flagUse = 1;
+
+	
 	
 	if(O_lock != 0){
 		newFile->lockOwner = creator;
 		newFile->flagO_lock = 1;
+		newFile->flagUse = 0;// le richieste successive saranno trascurate
 	} else {
 		newFile->lockOwner = -1;
 		newFile->flagO_lock = 0;
+		newFile->flagUse = 1;// poi continuero' a eseguire richieste sul file
 	}
 	
 	if( Pthread_mutex_init( &(newFile->lock) ) != 0){
