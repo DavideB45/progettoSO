@@ -26,8 +26,9 @@ GeneralList *newGeneralList(int (*comp)(const void*,const void*), void (*freeF)(
 	return newList;
 }
 
-//remove first occurrence of num
-//1 elem rimosso o non presente
+// remove first occurrence of num
+// 1 elem rimosso o non presente
+// ritorna 0 altrimenti
 _Bool generalListRemove(void* elem, GeneralList* list){
 	if(list == NULL){
 		//lista non esistente

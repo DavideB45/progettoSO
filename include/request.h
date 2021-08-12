@@ -17,6 +17,7 @@ enum operat {
 };
 
 enum servErrorRet {
+	NORET,
 	SUCCESS,// operazione completata
 	IMPOSSIBLE_READ,// fatale
 	NO_OP_SUPPORT,// fatale
@@ -63,8 +64,8 @@ enum servErrorRet {
 // dice se l'operazione va eseguita in modo bloccante
 #define GET_O_NON_BLOCK(x) ((x & (1 << 22)) == (1 << 22))
 
-// scrive la dimensione del nome del file
-// non conta lo '\0'
+// scrive la dimensione del nome del file 
+// non conta lo "\\0"
 #define SET_PATH_DIM(x, dim) x = x | (dim)
 #define GET_PATH_DIM(x) (x & 0x003fffff)
 
