@@ -862,7 +862,7 @@ int openFile(Request* req, ServerFile** filePtrP){
 	}
 	*client_ = req->client;
 	// controllare che non lo abbia gia' aperto
-	if(isInGeneralList(client_, filePtr->openList) == 0){
+	if(!isInGeneralList(client_, filePtr->openList)){
 		if(generalListInsert( (void* ) client_, filePtr->openList) == 0){
 			if(errno == ENOMEM){
 				sendClientFatalError(req->client, NO_MEMORY);
