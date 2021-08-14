@@ -34,11 +34,11 @@ int newClient(int clientId, ClientTable *tab);
 
 // mette file nella lista Open
 // se non ottengo mutua esclusione non lo metto
-int clientOpen(int clientId, const ServerFile** filePtr, int O_Lock, ClientTable* tab);
+int clientOpen(int clientId, ServerFile** filePtr, int O_Lock, ClientTable* tab);
 
 // mette file nella lista lock
 // se non ottengo mutua esclusione non lo metto
-int clientLock(int clientId, const ServerFile** filePtr, ClientTable* tab);
+int clientLock(int clientId,  ServerFile** filePtr, ClientTable* tab);
 
 
 
@@ -57,7 +57,7 @@ int clientClose(int clientId, const ServerFile** filePtr, int O_Lock, ClientTabl
 int clientUnlock(int clientId, const ServerFile** filePtr, ClientTable* tab);
 
 // dopo la rimozione di un file viene chiuso a tutti per evitare segFault
-int clientFileDel(const ServerFile** filePtr, ClientTable* tab);
+int clientFileDel( ServerFile** filePtr, ClientTable* tab);
 
 // restituisce il posto nell'array in cui sta il client
 int clientBucket(int clientId);

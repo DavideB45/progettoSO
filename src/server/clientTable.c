@@ -13,6 +13,20 @@ int filePtrCompare( const void* file1, const void* file2){
 }
 
 // ritorna puntatore alla struttura del client
+ClientInfo* clientGetNoLock(int clientId, ClientTable *tab){
+	int bucket = clientBucket(clientId);
+	ClientInfo* toRet = tab->arr[bucket];
+	while(toRet != NULL){
+		if(toRet->id == clientId){
+			return toRet;
+		} else {
+			toRet = toRet->next;
+		}
+	}
+	return toRet;
+}
+
+// ritorna puntatore alla struttura del client
 // poco plausibile che non ci sia
 // in caso di errore ritorna NULL
 ClientInfo* clientGet(int clientId, ClientTable *tab){
@@ -54,7 +68,7 @@ int newClient(int clientId, ClientTable *tab){
 		if(currClient->id == clientId){
 			Pthread_mutex_unlock( &(tab->lock ) );
 			errno = 0;
-			return 1;
+			return 0;
 		}
 		currClient = currClient->next;
 		precClient = currClient;
@@ -97,13 +111,15 @@ int newClient(int clientId, ClientTable *tab){
 	} else {
 		precClient->next = new_Client;
 	}
+	Pthread_mutex_unlock( &(tab->lock ) );
+	errno = 0;
 	return 1;
 }
 
 // mette file nella lista Open
 // se non ottengo mutua esclusione non lo metto
 // ritorna -1 errore 0 successo
-int clientOpen(int clientId,const ServerFile** filePtr, int O_Lock, ClientTable* tab){
+int clientOpen(int clientId, ServerFile** filePtr, int O_Lock, ClientTable* tab){
 	ClientInfo* clientPtr = clientGet(clientId, tab);
 	if(clientPtr == NULL){
 		// errno settato da clientGet
@@ -154,7 +170,8 @@ int clientOpen(int clientId,const ServerFile** filePtr, int O_Lock, ClientTable*
 
 // mette file nella lista lock
 // se non ottengo mutua esclusione non lo metto
-int clientLock(int clientId,const ServerFile** filePtr, ClientTable* tab){
+// return -1 fail 0 success setta errno
+int clientLock(int clientId, ServerFile** filePtr, ClientTable* tab){
 	ClientInfo* clientPtr = clientGet(clientId, tab);
 	if(clientPtr == NULL){
 		// errno settato da clientGet
@@ -186,24 +203,137 @@ int clientLock(int clientId,const ServerFile** filePtr, ClientTable* tab){
 
 
 
-// chiude tutto quello che aveva aperto
+// chiude tutto quello che aveva aperto (da chiamare alla disconnessione)
 // se non ottengo mutua esclusione lascio tutto aperto per chi verra' dopo
-int destroyClient(int clientId, ClientTable *tab);
+// return -1 fail 0 success setta errno
+int destroyClient(int clientId, ClientTable *tab){
+	ClientInfo* clientPtr = clientGet(clientId, tab);
+	if(clientPtr == NULL){
+		// errno settato da clientGet
+		return -1;
+	}
+	if( Pthread_mutex_lock( &(tab->lock) ) != 0){
+		errno = EPERM;
+		return -1;
+	}
+	if( Pthread_mutex_lock( &(clientPtr->lock) ) != 0){
+		errno = EPERM;
+		return -1;
+	}
+	ServerFile** filePtr = NULL;
+	// rimuovo la lock dai file su cui il client aveva la mutua esclusione
+	while(filePtr = generalListPop(clientPtr->fileLocked), filePtr != NULL){
+		if( Pthread_mutex_lock( &((*filePtr)->lock) ) != 0){
+			errno = EPERM;
+			return -1;
+		}
+		(*filePtr)->flagO_lock = 0;
+		generalListRemove(&clientId, (*filePtr)->openList);
+		generalListRemove(filePtr, clientPtr->fileInUse);
+		Pthread_mutex_unlock( &((*filePtr)->lock) );
+		free(filePtr);
+	}
+	// chiudo i file non chiusi
+	while(filePtr = generalListPop(clientPtr->fileInUse), filePtr != NULL){
+		if( Pthread_mutex_lock( &((*filePtr)->lock) ) != 0){
+			errno = EPERM;
+			return -1;
+		}
+		generalListRemove(&clientId, (*filePtr)->openList);
+		Pthread_mutex_unlock( &((*filePtr)->lock) );
+		free(filePtr);
+	}
+	Pthread_mutex_unlock( &(clientPtr->lock) );
+	Pthread_mutex_unlock( &(tab->lock) );
 
-// toglie file dalla lista close
-// se non ottengono la mutua esclusione lo lasciano aperto
-// rischio segFault chiudo client (il prossimo avra' qualche file gia' aperto)
-int clientClose(int clientId,const ServerFile** filePtr, int O_Lock, ClientTable* tab);
+	errno = 0;
+	return 0;
+}
+
+// toglie file dalla lista close di clientId
+// se non ottengono la mutua esclusione termino / chiudo client e rifaccio struct
+// return -1 fail 0 success setta errno
+int clientClose(int clientId, const ServerFile** filePtr, int O_Lock, ClientTable* tab){
+	ClientInfo* clientPtr = clientGet(clientId, tab);
+	if(clientPtr == NULL){
+		// errno settato da clientGet
+		return -1;
+	}
+	if( Pthread_mutex_lock( &(clientPtr->lock) ) != 0){
+		errno = EPERM;
+		return -1;
+	}
+	generalListRemove(filePtr, clientPtr->fileInUse);
+	if(O_Lock == 1){
+		generalListRemove(filePtr, clientPtr->fileLocked);
+	}
+	Pthread_mutex_unlock( &(clientPtr->lock) );
+	
+	errno = 0;
+	return 0;
+}
 
 // toglie file da lista lock
-// se non ottengono mutua esclusione 
-// rischio segFault chiudo client (il prossimo avra' qualche file gia' locked)
-int clientUnlock(int clientId,const ServerFile** filePtr, ClientTable* tab);
+// se non ottengono mutua esclusione termino / chiudo client e rifaccio struct
+// return -1 fail 0 success setta errno
+int clientUnlock(int clientId,const ServerFile** filePtr, ClientTable* tab){
+	ClientInfo* clientPtr = clientGet(clientId, tab);
+	if(clientPtr == NULL){
+		// errno settato da clientGet
+		return -1;
+	}
+	if( Pthread_mutex_lock( &(clientPtr->lock) ) != 0){
+		errno = EPERM;
+		return -1;
+	}
+	generalListRemove(filePtr, clientPtr->fileLocked);
+	Pthread_mutex_unlock( &(clientPtr->lock) );
+	
+	errno = 0;
+	return 0;
+}
 
 // dopo la rimozione di un file viene chiuso a tutti per evitare segFault
-// se fallisce e' devo terminare il server
-int clientFileDel(const ServerFile** filePtr, ClientTable* tab);
+// se fallisce devo terminare il server
+// da chiamare come ultima funzione di rimozione qunado nessuno ha puntatori a questo file
+// return -1 fail 0 success setta errno
+int clientFileDel(ServerFile** filePtr, ClientTable* tab){
+	if( Pthread_mutex_lock( &(tab->lock) ) != 0){
+		errno = EPERM;
+		return -1;
+	}
+	// non controllo errori perche' posso continuare senza mutua esclusione
+	Pthread_mutex_lock( &((*filePtr)->lock) );
+	int* clientId = NULL;
+	ClientInfo* clientPtr;
+	while(clientId = generalListPop( (*filePtr)->openList ), clientId != NULL){
+		// non posso chiamare clientClose perche' perderei mutua esclusione
+		clientPtr = clientGetNoLock(*clientId, tab);
+		if(clientPtr != NULL){
+			// se avanza tempo chiudere il client e non terminare completamente
+			if( Pthread_mutex_lock( &(clientPtr->lock) ) != 0){
+				errno = EPERM;
+				return -1;
+			}
+			generalListRemove( (void*) filePtr, clientPtr->fileInUse );
+			Pthread_mutex_unlock( &(clientPtr->lock) );
+		}
+	}
+	if( (*filePtr)->flagO_lock == 1){
+		clientPtr = clientGetNoLock(  (*filePtr)->lockOwner , tab);
+		if( Pthread_mutex_lock( &(clientPtr->lock) ) != 0){
+			errno = EPERM;
+			return -1;
+		}
+		generalListRemove( (void*) filePtr, clientPtr->fileLocked );
+		Pthread_mutex_unlock( &(clientPtr->lock) );
+	}
+	errno = 0;
+	return 0;
+}
 
 // restituisce il posto nell'array in cui sta il client
-int clientBucket(int clientId);
+int clientBucket(int clientId){
+	return clientId % BASEDIM;
+}
 
