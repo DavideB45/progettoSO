@@ -9,6 +9,7 @@
 #include <FifoList.h>
 #include <request.h>
 #include <tree.h>
+#include <clientTable.h>
 
 // connection
 #include <sys/socket.h>
@@ -35,8 +36,15 @@
 								exit(EXIT_FAILURE);\
 							}
 
+#define DISCONN_CLIENT(_client_) disconnectClient(_client_, resourceTable);\
+								 CONN_MARK(_client_, NOT_CONNECTED);\
+								 PIPE_WRITE(_client_);
+								 
+#define LISTEN_CLIENT(_client_) CONN_MARK(_client_, CONNECTED);\
+								PIPE_WRITE(_client_);
+
 ServerInfo srvGen;
-FifoList resourceQueue;
+ClientTable* resourceTable;// da inizializzare
 FifoList logQueue;
 TreeFile* fileStorage;
 
@@ -125,6 +133,7 @@ printf("sono tornato dal dispatcher\n");
 
 int initServer(void){
 	fileStorage = newTreeFile();
+	resourceTable = newClientTable();
 	readConfig("./servWork/file_config");
 
 	// creo una pipe
@@ -246,6 +255,7 @@ void* dispatcher(void){
 						} else {
 							/* METTO NUOVO CLIENT NELLA MASCHERA */
 							printf("NUOVA CONNESSIONE %d\n", newConn);
+							newClient(newConn, resourceTable);///////////vedere se spostare e farlo fare al client
 							if(maxFD < newConn)
 								maxFD = newConn;
 							FD_SET(newConn, &set);
@@ -441,8 +451,7 @@ printf("ciao, sono nato %d\n", threadId);
 		break;
 		case 0:
 			/* il client ha chiuso il socket */
-			CONN_MARK(clId, NOT_CONNECTED);
-			PIPE_WRITE(clId)
+			DISCONN_CLIENT(clId);
 		break;
 		default:;
 			Request* req = newRequest(oper, clId, NULL, 0, NULL);
@@ -678,15 +687,13 @@ int readFormSocket(int sock, void* buff, int dim){
 		buffInt = IMPOSSIBLE_READ;
 		writen(sock, &buffInt, sizeof(int));
 		buffInt = sock;
-		CONN_MARK(buffInt, NOT_CONNECTED);
-		PIPE_WRITE(buffInt);
+		DISCONN_CLIENT(buffInt);
 		return -1;
 	break;
 	case 0:
 		/* client chiuso EOF */
 		buffInt = sock;
-		CONN_MARK(buffInt, NOT_CONNECTED);
-		PIPE_WRITE(buffInt);
+		DISCONN_CLIENT(buffInt);
 		return -1;
 	break;
 	default:
@@ -697,12 +704,10 @@ int readFormSocket(int sock, void* buff, int dim){
 
 int sendClientResult(int client, void* reply, int dim){
 	if(writen(client, reply, dim) != 1){
-		CONN_MARK(client, NOT_CONNECTED);
-		PIPE_WRITE(client);
+		DISCONN_CLIENT(client);
 		return -1;
 	} else {
-		CONN_MARK(client, CONNECTED);
-		PIPE_WRITE(client);
+		LISTEN_CLIENT(client);
 		return 0;
 	}
 }
@@ -712,13 +717,11 @@ void sendClientError(int sock, int err){
 	if( writen(sock, &err, sizeof(int)) == 1){
 		/* riesco a informare il client */
 		buffInt = sock;
-		CONN_MARK(buffInt, CONNECTED);
-		PIPE_WRITE(buffInt);
+		LISTEN_CLIENT(buffInt);
 	} else {
 		/* non riesco a informare il client */
 		buffInt = sock;
-		CONN_MARK(buffInt, NOT_CONNECTED);
-		PIPE_WRITE(buffInt);
+		DISCONN_CLIENT(buffInt);
 	}
 }
 
@@ -726,8 +729,7 @@ void sendClientFatalError(int sock, int err){
 	int buffInt = err;
 	writen(sock, &buffInt, sizeof(int));
 	buffInt = sock;
-	CONN_MARK(buffInt, NOT_CONNECTED);
-	PIPE_WRITE(buffInt);
+	DISCONN_CLIENT(buffInt);
 }
 
 
@@ -838,12 +840,15 @@ int openFile(Request* req, ServerFile** filePtrP){
 		break;
 		case 1:;
 			int res = SUCCESS;
-			sendClientResult(req->client, &res, sizeof(int));
 			req->sFileName = NULL;// evito di distruggere il nome
 			*filePtrP = filePtr;
 			if(GET_O_LOCK(req->oper)){
+				clientOpen(req->client, &filePtr, TRUE, resourceTable);
+				sendClientResult(req->client, &res, sizeof(int));
 				return COMPLETED_STOP;
 			}
+			clientOpen(req->client, &filePtr, TRUE, resourceTable);
+			sendClientResult(req->client, &res, sizeof(int));
 			return COMPLETED_CONT;
 		break;
 		default:
@@ -873,6 +878,7 @@ int openFile(Request* req, ServerFile** filePtrP){
 			return FAILED_CONT;
 		}
 	}
+	// chiedo la lock
 	if(GET_O_LOCK(req->oper)){
 		if( Pthread_mutex_lock( &(filePtr->lock) ) != 0){
 			generalListRemove(client_, filePtr->openList);
@@ -884,20 +890,23 @@ int openFile(Request* req, ServerFile** filePtrP){
 		filePtr->flagUse = 0;
 		filePtr->lockOwner = req->client;
 		int reply = SUCCESS;
+		clientOpen(req->client, &filePtr, TRUE, resourceTable);
 		sendClientResult(req->client, &reply, sizeof(int));
 		Pthread_mutex_unlock( &(filePtr->lock) );
 		return COMPLETED_STOP;
 	}
 	
+	// era gia' locked
 	int reply = SUCCESS;
 	if(filePtr->flagO_lock == 1){
 		Pthread_mutex_lock( &(filePtr->lock) );///////non so come gestire un errore (rimuovere file?)
 		filePtr->flagUse = 0;
 		Pthread_mutex_unlock( &(filePtr->lock) );
+		clientOpen(req->client, &filePtr, TRUE, resourceTable);
 		sendClientResult(req->client, &reply, sizeof(int));
 		return COMPLETED_STOP;
 	}
-
+	clientOpen(req->client, &filePtr, FALSE, resourceTable);
 	sendClientResult(req->client, &reply, sizeof(int));
 	return COMPLETED_CONT;
 	

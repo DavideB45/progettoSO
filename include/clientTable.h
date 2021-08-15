@@ -27,6 +27,8 @@ typedef struct clientTable{
 }ClientTable;
 
 
+ClientTable* newClientTable();
+
 // attiva un posto in cui saranno tenute informazioni sul client
 // se fallisce chiudo il client
 // return -1 fail 0 success
@@ -44,17 +46,17 @@ int clientLock(int clientId,  ServerFile** filePtr, ClientTable* tab);
 
 // chiude tutto quello che aveva aperto
 // se non ottengo mutua esclusione lascio tutto aperto per chi verra' dopo
-int destroyClient(int clientId, ClientTable *tab);
+int disconnectClient(int clientId, ClientTable *tab);
 
 // toglie file dalla lista close
 // se non ottengono la mutua esclusione lo lasciano aperto
-// rischio segFault chiudo client (il prossimo avra' qualche file gia' aperto)
-int clientClose(int clientId, const ServerFile** filePtr, int O_Lock, ClientTable* tab);
+// rischio segFault distruggo la struct client o termino
+int clientClose(int clientId, ServerFile** filePtr, int O_Lock, ClientTable* tab);
 
 // toglie file da lista lock
 // se non ottengono mutua esclusione 
 // rischio segFault chiudo client (il prossimo avra' qualche file gia' locked)
-int clientUnlock(int clientId, const ServerFile** filePtr, ClientTable* tab);
+int clientUnlock(int clientId, ServerFile** filePtr, ClientTable* tab);
 
 // dopo la rimozione di un file viene chiuso a tutti per evitare segFault
 int clientFileDel( ServerFile** filePtr, ClientTable* tab);

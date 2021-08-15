@@ -11,6 +11,7 @@
 
 
 int intCompare(const void* A,const void* B){
+	printf("%d == %d\n", *((int*) A), *((int*) B));
 	return *((int*) A) - *((int*) B);
 }
 

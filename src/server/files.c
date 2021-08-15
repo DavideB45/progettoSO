@@ -73,7 +73,7 @@ ServerFile* newServerFile(int creator, int O_lock, char* nameP){
 		errno = ENOMEM;
 		return NULL;
 	}
-	
+	*newOpen = creator;
 	generalListInsert( (void*) newOpen, newFile->openList);
 	
 	//devo modificare la struttura

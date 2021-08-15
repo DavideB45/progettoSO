@@ -47,7 +47,7 @@ _Bool generalListRemove(void* elem, GeneralList* list){
 	}
 	
 	GeneralListNode *precPtr = NULL;
-	if(!( list->compFun( elem, (list->head->elem) ) )){
+	if(!( list->compFun(elem, (list->head->elem)) )){
 		//elemento rimosso dalla testa
 		list->head = list->head->nextPtr;
 		if (list->head == NULL){
@@ -57,7 +57,6 @@ _Bool generalListRemove(void* elem, GeneralList* list){
 		free(currPtr);
 		return 1;
 	}
-
 	while(currPtr != NULL && !( list->compFun( elem, (currPtr->elem) ) )){
 		precPtr = currPtr;
 		currPtr = currPtr->nextPtr;
@@ -68,7 +67,7 @@ _Bool generalListRemove(void* elem, GeneralList* list){
 	} else {
 		//elemento rimosso
 		if (currPtr == list->queue){
-			list->queue = currPtr->nextPtr;
+			list->queue = precPtr;
 		}
 		precPtr->nextPtr = currPtr->nextPtr;
 		list->freeFun(currPtr->elem);
@@ -91,19 +90,16 @@ _Bool generalListInsert(void *elem, GeneralList* list){
 		errno = ENOMEM;
 		return 0;
 	}
-
+	newNode->elem = elem;
+	newNode->nextPtr = NULL;
 	if(list->head == NULL){
 		//lista vuota
 		list->head = newNode;
 		list->queue = newNode;
-		list->head->nextPtr = NULL;
-		list->head->elem = elem;
 		errno = 0;
 		return 1;
 	}
 	
-	newNode->nextPtr = NULL;
-	newNode->elem = elem;
 	list->queue->nextPtr = newNode;
 	list->queue = newNode;
 	errno = 0;

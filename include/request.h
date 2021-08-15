@@ -4,7 +4,8 @@
 #pragma once
 
 enum operat {
-	CLOSE_CONNECTION, 
+	CLOSE_CONNECTION,
+	OPEN_CONNECTION,
 	OPEN_FILE, 
 	READ_FILE, 
 	READ_N_FILES, 
