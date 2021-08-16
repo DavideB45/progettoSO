@@ -1,8 +1,11 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <pthread.h>
 #include <utils.h>
 #include <errno.h>
+
+#include <pthread.h>
+#include <string.h>
+
 #include <generalList.h>
 #include <files.h>
 #include <request.h>
@@ -18,9 +21,9 @@ int fakeComp(const void* a,const void* b){
 ///////////////////////////////////////////////////////////////////////////////////////////////
 
 ServerFile* newServerFile(int creator, int O_lock, char* nameP){
-	if(creator < 0){
+	if(creator < 0 || nameP == NULL){
 		//errore parametri
-		printf("creator < 0\n");
+		printf("creator < 0 || name P == NULL\n");
 		errno = EFAULT;
 		return NULL;
 	}
@@ -35,7 +38,14 @@ ServerFile* newServerFile(int creator, int O_lock, char* nameP){
 	}
 	
 	newFile->creator = creator;
-	newFile->namePath = nameP;
+	int nameL = strlen(nameP) + 1;
+	newFile->namePath = malloc(nameL*sizeof(char));
+	if(newFile->namePath == NULL){
+		perror("mallock ServerFile->name");
+		errno = ENOMEM;
+		return NULL;
+	}
+	newFile->namePath = strcpy(newFile->namePath, nameP);
 	newFile->data = NULL;
 	newFile->dim = 0;
 

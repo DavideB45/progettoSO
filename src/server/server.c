@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <string.h>
+#include <time.h>
 
 // selfmade
 #include <utils.h>
@@ -10,6 +11,7 @@
 #include <request.h>
 #include <tree.h>
 #include <clientTable.h>
+#include <logFun.h>
 
 // connection
 #include <sys/socket.h>
@@ -45,7 +47,7 @@
 
 ServerInfo srvGen;
 ClientTable* resourceTable;// da inizializzare
-FifoList logQueue;
+FifoList* logQueue;
 TreeFile* fileStorage;
 
 void readConfig(char* indirizzo);
@@ -56,6 +58,7 @@ void* dispatcher(void);
 // ritorna il massimo FD da ascoltare
 int updatemax(fd_set set, int maxFD);
 
+void* logThread(void*);
 
 // il puntatore a intero passato indica il suo posto nell'array
 void* worker(void*);
@@ -134,6 +137,7 @@ printf("sono tornato dal dispatcher\n");
 int initServer(void){
 	fileStorage = newTreeFile();
 	resourceTable = newClientTable();
+	logQueue = newList();
 	readConfig("./servWork/file_config");
 
 	// creo una pipe
@@ -174,6 +178,10 @@ int initServer(void){
 
 void createThreads(void){
 	int* id;
+	if( pthread_create( &(srvGen.threadLog), NULL, logThread,  NULL) != 0){
+			perror("pthread create");
+			exit(EXIT_FAILURE);
+	}
 	for(size_t i = 0; i < srvGen.n_worker; i++){
 		if(id = malloc(sizeof(int)), id == NULL){
 			perror("malloc Int");
@@ -426,7 +434,67 @@ int updatemax(fd_set set, int maxFD){
 	return -1;
 }
 
-
+void* logThread(void* arg){
+	FILE * filePtr = NULL;
+	filePtr = fopen(srvGen.logName, "a+");
+	if(filePtr == NULL){
+		printf("fileNotFound\n");
+		return NULL;
+	}
+	time_t approxTime = time(NULL);
+	fprintf(filePtr, "APERTURA SERVER %s\n", ctime(&approxTime));
+	LogOp* toWrite = pop(logQueue);
+	while(toWrite != NULL){
+		fprintf(filePtr, "%d : ", toWrite->client );
+		if(CLIENT_OP(toWrite)){
+			fprintf(filePtr, "%d %s | ", toWrite->opType, operatToString(toWrite->opType, FALSE));
+			fprintf(filePtr, "res = %d | ", toWrite->result);
+			if(toWrite->fileName != NULL){
+				fprintf(filePtr, "%s | ", toWrite->fileName);
+			}
+			
+			if(toWrite->result == 1){
+				if(toWrite->deltaDim != 0){
+					fprintf(filePtr, "editDim = %+d | ", toWrite->deltaDim);
+				}
+			}
+		}
+		if(LRU_REPLACE(toWrite)){
+			fprintf(filePtr, "%d : file rem = %d freed mem = %d", toWrite->client, FILE_REMOVED(toWrite), FREED_MEMORY(toWrite));
+		}
+		if(LRU_NEW_MAX(toWrite)){
+			fprintf(filePtr, "%d : ", toWrite->client);
+			switch(NEW_MAX_TIPE(toWrite)){
+			case MAXDIM:
+				fprintf(filePtr, "MAX dim = %d curr n file = %d | ", NEW_DIM(toWrite), NEW_FILE_N(toWrite));
+			break;
+			case MAXFILE:
+				fprintf(filePtr, "curr dim = %d MAX n file = %d | ", NEW_DIM(toWrite), NEW_FILE_N(toWrite));
+			break;
+			case MAXALL:
+				fprintf(filePtr, "MAX dim = %d MAX n file = %d | ", NEW_DIM(toWrite), NEW_FILE_N(toWrite));
+			break;
+			}
+		}
+		if(SERV_CLOSE(toWrite)){
+			fprintf(filePtr, "%d : N file = %d DIM tot = %d",toWrite->client, FILE_REMANING(toWrite), SPACE_USE(toWrite));
+		}
+		
+		
+		fprintf(filePtr, "%s", ctime( &(toWrite->execTime)) );
+		fflush(filePtr);
+		if(!SERV_CLOSE(toWrite)){
+			destroyLogOp(toWrite);
+			toWrite = pop(logQueue);
+		} else {
+			destroyLogOp(toWrite);
+			toWrite = NULL;
+		}
+	}
+	printf("non scrivo nel file piccione\n");
+	fclose(filePtr);
+	return NULL;
+}
 
 
 void* worker(void* idThread){
@@ -446,7 +514,7 @@ printf("ciao, sono nato %d\n", threadId);
 		int oper = 0;
 		switch( readn(clId, &oper, sizeof(int)) ){
 		case -1:
-			/* errore in lettura non risolvibile */			
+			/* errore in lettura non risolvibile */		
 			sendClientFatalError(clId, IMPOSSIBLE_READ);
 		break;
 		case 0:
@@ -840,7 +908,6 @@ int openFile(Request* req, ServerFile** filePtrP){
 		break;
 		case 1:;
 			int res = SUCCESS;
-			req->sFileName = NULL;// evito di distruggere il nome
 			*filePtrP = filePtr;
 			if(GET_O_LOCK(req->oper)){
 				clientOpen(req->client, &filePtr, TRUE, resourceTable);

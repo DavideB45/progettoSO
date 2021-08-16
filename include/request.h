@@ -87,6 +87,9 @@ typedef struct Request{
 // ritorna NULL se fallisce
 Request* newRequest(int oper, int client, char* sFilename, int editDim, char* forEdit);
 
+// restituisce una stringa che identifica l'operazione
+char* operatToString(enum operat oper, int uppercase);
+
 // libera la memoria usata da una richiesta
 // e mette a NULL il puntatore?
 void destroyRequest(Request** req);

@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <string.h>
 
+#include <time.h>
 #include <pthread.h>
 
 #include <files.h>
@@ -26,14 +27,23 @@ int main(void){
 		free(NULL);
 	}
 	printf("\n");
-	read_config("./servWork/file_config");
 	
-	Request* test = NULL;
-	printf("%x\n", test);
-	test = newRequest(3, 3, NULL, 0, NULL);
-	printf("%x\n", test);
-	destroyRequest(&test);
-	printf("%x\n", test);
+	time_t now = time(NULL);
+	char* tempo = ctime( &now );
+	printf("%sl\n", tempo);
+	tempo = operatToString(3, 0);
+	printf("%s %+d | ", tempo, -2);
+	FILE* fPtr = fopen("./servWork/piccione", "a+");
+	printf("%d\n", fprintf(fPtr, "tre %d\n", 3));
+	// read_config("./servWork/file_config");
+	
+
+	// Request* test = NULL;
+	// printf("%x\n", test);
+	// test = newRequest(3, 3, NULL, 0, NULL);
+	// printf("%x\n", test);
+	// destroyRequest(&test);
+	// printf("%x\n", test);
 
 	// unsigned int operazione;
 	// SET_CLEAN(operazione);

@@ -54,6 +54,7 @@ typedef struct ServerInfo{
 	int serverStatus;// per capire se deve chiudere
 	int n_worker;// totale thread worker
 	ThreadInfo* *threadUse;// array che dice cosa fanno i thread
+	pthread_t threadLog;// gestore del file di log
 }ServerInfo;
 
 

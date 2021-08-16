@@ -15,4 +15,4 @@ _max_file:::= 2
 
 
 _max_dim :=       _socket_name= daddu
-_file_log_name =:0
+_file_log_name =: 0
