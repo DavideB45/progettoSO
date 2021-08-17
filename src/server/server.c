@@ -45,6 +45,12 @@
 #define LISTEN_CLIENT(_client_) CONN_MARK(_client_, CONNECTED);\
 								PIPE_WRITE(_client_);
 
+#define LOG_INSERT(logInfox) if(logInfox != NULL){\
+								if(insert(logQueue, logInfox) == 0){\
+									destroyLogOp(logInfox);\
+								}\
+							 }
+
 ServerInfo srvGen;
 ClientTable* resourceTable;// da inizializzare
 FifoList* logQueue;
@@ -64,9 +70,9 @@ void* logThread(void*);
 void* worker(void*);
 // esegue una richiesta
 void manageRequest(Request* req, int threadId);
-// setta il flag in use di un file
-// torna 1 se successo e le operazioni possono essere svolte senza lock
-// rorna 0 se fallisce
+// ret -1 errore
+// ret 0 delayed
+// ret 1 utilizzabile
 // non effettua controlli sugli argomenti passati
 int tryUse(ServerFile* filePtr, Request* req, int closeOnFail);
 // ritorna quando nessuno possiede un puntatore al file che voglio rimuovere
@@ -100,6 +106,11 @@ int removeFile(Request* req, ServerFile* filePtr);
 
 
 //////////////////////////////////////////////////////////////
+// legge il nome di un file da un socket
+// se ci riesce lo cerca nell'albero
+// ritorna il puntatore al file
+// se va a buon fine *result == NONE
+ServerFile* getFileFromSocket(Request* req, enum operResult* result, int threadId);
 // legge da un socket e lo chiude in caso di fallimento di readn
 // informa il dispatcher
 // ritorna 0 fallimento
@@ -192,7 +203,6 @@ void createThreads(void){
 			perror("pthread create");
 			exit(EXIT_FAILURE);
 		}
-		printf("creato worker %lu\n", i);
 	}
 	
 }
@@ -263,6 +273,8 @@ void* dispatcher(void){
 						} else {
 							/* METTO NUOVO CLIENT NELLA MASCHERA */
 							printf("NUOVA CONNESSIONE %d\n", newConn);
+							LogOp* infoLog = newLogOp(OPEN_CONNECTION, NULL, newConn, 1, 0, 0);
+							LOG_INSERT(infoLog);
 							newClient(newConn, resourceTable);///////////vedere se spostare e farlo fare al client
 							if(maxFD < newConn)
 								maxFD = newConn;
@@ -288,14 +300,15 @@ void* dispatcher(void){
 							case 1:
 								if(IS_TO_RESET(resetConn)){
 									//torno ad ascoltare su quel socket
-		printf("ascolto nuovamente %d\n", GET_FD(resetConn));//////////////////////////////////////
 									if(maxFD < GET_FD(resetConn))
 										maxFD = GET_FD(resetConn);
 									FD_SET(GET_FD(resetConn), &set);
 								} else {
 									// chiudo il socket
+									// non precisissimo con la dimensione
+									LogOp* infoLog = newLogOp(CLOSE_CONNECTION, NULL, GET_FD(resetConn), 1, 0, sizeof(int));
+									LOG_INSERT(infoLog);
 									FD_CLR(GET_FD(resetConn), &set);
-		printf("smetto di ascoltare %d\n", GET_FD(resetConn));//////////////////////////////////////
 									if(close(GET_FD(resetConn))){
 										perror("close client");
 									}									
@@ -339,19 +352,77 @@ void readConfig(char* indirizzo){
 	filePtr = fopen(indirizzo, "r");
 	if(filePtr == NULL){
 		printf("fileNotFound\n");
-		/////////////////////////////////inserire nomi e thread
+		
+		srvGen.sockName = malloc(18);
+		if(srvGen.sockName == NULL)
+			exit(1);
+		strcpy(srvGen.sockName, "./servWork/socket");
+
+		srvGen.logName = malloc(15);
+		if(srvGen.logName == NULL)
+			exit(1);
+		strcpy(srvGen.logName, "./servWork/log");
+		
 		return;
-	}
-	int num;
-	char str[30];
+	} else {
+		int num;
+		char str[30];
 
-	fscanf(filePtr, "%*[^_]");
+		fscanf(filePtr, "%*[^_]");
 
-	if(fscanf(filePtr, "%*[_n_worker]%*[ :=\t]%d%*[ \n]", &num) == 1){
-		if(num > 0){
-			srvGen.n_worker = num;		
+		if(fscanf(filePtr, "%*[_n_worker]%*[ :=\t]%d%*[ \n]", &num) == 1){
+			if(num > 0){
+				srvGen.n_worker = num;		
+			}
+		}
+
+		if(fscanf(filePtr, "%*[_max_file]%*[ :=\t]%d\n", &num) == 1){
+			if(num > 0){
+				srvGen.maxFileNum = num;
+			}
+		}
+
+		if(fscanf(filePtr, "%*[_max_dim]%*[ :=\t]%d%*[\n MbBm]", &num) == 1){
+			if(num > 0){
+				srvGen.maxFileDim = num;
+			}
+		}
+		
+		if(fscanf(filePtr, "%*[_socket_name]%*[ :=\t]%s\n", str) != 1){
+			str[0] = '0';
+			str[1] = 0;
+		}
+		if( (strlen(str) == 1 && str[0] == '0') || (strcmp(str, "_file_log_name") == 0) ){
+			srvGen.sockName = malloc(18);
+			if(srvGen.sockName == NULL)
+				exit(1);
+			strcpy(srvGen.sockName, "./servWork/socket");
+		} else {
+			srvGen.sockName = malloc( strlen(str) + 1 + 11 );
+			if(srvGen.sockName == NULL)
+				exit(1);
+			strcpy(srvGen.sockName, "./servWork/");
+			strcat(srvGen.sockName, str);
+		}
+
+		if(fscanf(filePtr, "%*[_file_log_name]%*[ :=\t]%s\n", str) != 1){
+			str[0] = '0';
+			str[1] = 0;
+		}
+		if(strlen(str) == 1 && str[0] == '0'){
+			srvGen.logName = malloc(15);
+			if(srvGen.logName == NULL)
+				exit(1);
+			strcpy(srvGen.logName, "./servWork/log");
+		} else {
+			srvGen.logName = malloc( strlen(str) + 1 + 11);
+			if(srvGen.logName == NULL)
+				exit(1);
+			strcpy(srvGen.logName, "./servWork/");
+			strcat(srvGen.logName, str);	
 		}
 	}
+	
 	srvGen.threadUse = malloc(sizeof(ThreadInfo*)*srvGen.n_worker);
 	if(srvGen.threadUse == NULL){
 		perror("malloc threadUse[]");
@@ -375,54 +446,12 @@ void readConfig(char* indirizzo){
 	}
 	printf("worker : %d\n", srvGen.n_worker);
 
-	if(fscanf(filePtr, "%*[_max_file]%*[ :=\t]%d\n", &num) == 1){
-		if(num > 0){
-			srvGen.maxFileNum = num;
-		}
-	}
 	printf("maxFil : %d\n", srvGen.maxFileNum);
-
-	if(fscanf(filePtr, "%*[_max_dim]%*[ :=\t]%d%*[\n MbBm]", &num) == 1){
-		if(num > 0){
-			srvGen.maxFileDim = num;
-		}
-	}
+	
 	printf("maxDim : %d\n", srvGen.maxFileDim);
 
-	if(fscanf(filePtr, "%*[_socket_name]%*[ :=\t]%s\n", str) != 1){
-		str[0] = '0';
-		str[1] = 0;
-	}
-	if( (strlen(str) == 1 && str[0] == '0') || (strcmp(str, "_file_log_name") == 0) ){
-		srvGen.sockName = malloc(18);
-		if(srvGen.sockName == NULL)
-			exit(1);
-		strcpy(srvGen.sockName, "./servWork/socket");
-	} else {
-		srvGen.sockName = malloc( strlen(str) + 1 + 11 );
-		if(srvGen.sockName == NULL)
-			exit(1);
-		strcpy(srvGen.sockName, "./servWork/");
-		strcat(srvGen.sockName, str);
-	}
 	printf("nameSo : %s\n", srvGen.sockName);
 
-	if(fscanf(filePtr, "%*[_file_log_name]%*[ :=\t]%s\n", str) != 1){
-		str[0] = '0';
-		str[1] = 0;
-	}
-	if(strlen(str) == 1 && str[0] == '0'){
-		srvGen.logName = malloc(15);
-		if(srvGen.logName == NULL)
-			exit(1);
-		strcpy(srvGen.logName, "./servWork/log");
-	} else {
-		srvGen.logName = malloc( strlen(str) + 1 + 11);
-		if(srvGen.logName == NULL)
-			exit(1);
-		strcpy(srvGen.logName, "./servWork/");
-		strcat(srvGen.logName, str);	
-	}
 	printf("nameLo : %s\n", srvGen.logName);
 }
 
@@ -442,12 +471,12 @@ void* logThread(void* arg){
 		return NULL;
 	}
 	time_t approxTime = time(NULL);
-	fprintf(filePtr, "APERTURA SERVER %s\n", ctime(&approxTime));
+	fprintf(filePtr, "\nAPERTURA SERVER %s", ctime(&approxTime));
 	LogOp* toWrite = pop(logQueue);
 	while(toWrite != NULL){
-		fprintf(filePtr, "%d : ", toWrite->client );
+		fprintf(filePtr, "%3d : ", toWrite->client );
 		if(CLIENT_OP(toWrite)){
-			fprintf(filePtr, "%d %s | ", toWrite->opType, operatToString(toWrite->opType, FALSE));
+			fprintf(filePtr, "%2d %17s | ", toWrite->opType, operatToString(toWrite->opType, FALSE));
 			fprintf(filePtr, "res = %d | ", toWrite->result);
 			if(toWrite->fileName != NULL){
 				fprintf(filePtr, "%s | ", toWrite->fileName);
@@ -460,10 +489,9 @@ void* logThread(void* arg){
 			}
 		}
 		if(LRU_REPLACE(toWrite)){
-			fprintf(filePtr, "%d : file rem = %d freed mem = %d", toWrite->client, FILE_REMOVED(toWrite), FREED_MEMORY(toWrite));
+			fprintf(filePtr, "file rem = %d freed mem = %d", FILE_REMOVED(toWrite), FREED_MEMORY(toWrite));
 		}
 		if(LRU_NEW_MAX(toWrite)){
-			fprintf(filePtr, "%d : ", toWrite->client);
 			switch(NEW_MAX_TIPE(toWrite)){
 			case MAXDIM:
 				fprintf(filePtr, "MAX dim = %d curr n file = %d | ", NEW_DIM(toWrite), NEW_FILE_N(toWrite));
@@ -506,7 +534,6 @@ printf("ciao, sono nato %d\n", threadId);
 	while (1){
 	
 	readSocK = (int*) pop( srvGen.toServe );
-	printf("richiesta da %d\n", *readSocK);
 	if(readSocK == NULL){
 		pthread_exit(NULL);
 	} else {
@@ -522,6 +549,7 @@ printf("ciao, sono nato %d\n", threadId);
 			DISCONN_CLIENT(clId);
 		break;
 		default:;
+			printf("%d : richiesta da %d\n",threadId, *readSocK);
 			Request* req = newRequest(oper, clId, NULL, 0, NULL);
 			manageRequest(req, threadId);
 		break;
@@ -534,6 +562,7 @@ printf("ciao, sono nato %d\n", threadId);
 void manageRequest(Request* req, int threadId){
 	ServerFile* filePtr = NULL;
 	Request* newReq = NULL;
+	LogOp* infoLog = NULL;
 	enum operResult result = NONE;
 	int buffInt = 0;
 	do{
@@ -547,47 +576,25 @@ void manageRequest(Request* req, int threadId){
 			printf("OPEN_FILE\n");
 			if(req->sFileName == NULL){
 				/* e' la prima volta che vediamo questa richiesta */
-				int dim = GET_PATH_DIM(req->oper);
-				req->sFileName = malloc(dim + 1);
-				if(req->sFileName == NULL){
-					/* non c'e' spazio */
-					sendClientFatalError(req->client, NO_MEMORY);
-					result = FAILED_STOP;
-				} else {
-					/* c'e' spazio */
-	printf("%d : leggo il nome del file\n", threadId);///////////////////////////////////////////
-					if( readFormSocket(req->client, req->sFileName, dim + 1) == 0){
-						/* tutto ok */
-	printf("%d : nome file = %s\n", threadId, req->sFileName);////////////////////////////////////
-						if( PERSONAL_LOCK_ACQUIRE != 0){
-							/* non posso eseguire */
-							perror("Personal lock acquire");
-							sendClientError(req->client, UNKNOWN_ERROR);
-							result = FAILED_STOP;
-						} else {
-							filePtr = TreeFileFind(fileStorage, req->sFileName);
-							if(errno != 0){
-								sendClientError(req->client, UNKNOWN_ERROR);
-							}
-							PERSONAL_FILE_SET(filePtr);
-							PERSONAL_LOCK_RELEASE;
-							if(filePtr == NULL){
-								/* file non trovato forse lo creo*/
-								result = openFile(req, &filePtr);
-	printf("%d : risultato = %d\n", threadId, result);
-							} else {
-								/* file trovato (eseguo la richiesta) */
-								if(tryUse(filePtr, req, FALSE)){
-									result = openFile(req, &filePtr);
-								} else {
-									result = FAILED_STOP;
-								}
-							}
-						}
+				filePtr = getFileFromSocket(req, &result, threadId);
+				if(result == NONE){
+					if(filePtr == NULL){
+						/* file non trovato forse lo creo*/
+						result = openFile(req, &filePtr);
 					} else {
-						/* non ho letto il nome */
-						sendClientFatalError(req->client, IMPOSSIBLE_READ);
-						result = FAILED_STOP;
+						/* file trovato (eseguo la richiesta) */
+						// da sistemare per delayed
+						switch(tryUse(filePtr, req, FALSE)){
+						case -1:
+							result = FAILED_STOP;
+						break;
+						case 0:
+							result = DELAYED;
+						break;
+						case 1:
+							result = openFile(req, &filePtr);
+						break;
+						}
 					}
 				}
 				/*  alla fine di questo if filePtr non puo' essere NULL
@@ -599,7 +606,22 @@ void manageRequest(Request* req, int threadId){
 			} else {
 				result = openFile(req, &filePtr);
 			}
-			
+			if(result == COMPLETED_CONT){
+				infoLog = newLogOp(OPEN_FILE, req->sFileName, req->client, 1, 0, sizeof(int));
+				LOG_INSERT(infoLog);
+			} else {
+				if(result == COMPLETED_STOP){
+					infoLog = newLogOp(OPEN_FILE, req->sFileName, req->client, 1, 0, sizeof(int));
+					LOG_INSERT(infoLog);
+					infoLog = newLogOp(LOCK_FILE, req->sFileName, req->client, 1, 0, sizeof(int));
+					LOG_INSERT(infoLog);
+				} else {
+					if(result != DELAYED){
+						infoLog = newLogOp(OPEN_FILE, req->sFileName, req->client, 0, 0, sizeof(int));
+						LOG_INSERT(infoLog);
+					}
+				}
+			}
 		break;
 		case READ_FILE:
 			printf("READ_FILE\n");
@@ -745,7 +767,46 @@ void manageRequest(Request* req, int threadId){
 }
 
 
-
+// legge il nome di un file da un socket
+// se ci riesce lo cerca nell'albero
+// ritorna il puntatore al file
+// se va a buon fine *result == NONE
+ServerFile* getFileFromSocket(Request* req, enum operResult* result, int threadId){
+	int dim = GET_PATH_DIM(req->oper);
+	ServerFile* filePtr = NULL;
+	req->sFileName = malloc(dim + 1);
+	*result = NONE;
+	if(req->sFileName == NULL){
+		/* non c'e' spazio */
+		sendClientFatalError(req->client, NO_MEMORY);
+		*result = FAILED_STOP;
+	} else {
+		/* c'e' spazio */
+		if( readFormSocket(req->client, req->sFileName, dim + 1) == 0){
+			/* tutto ok */
+printf("%d : nome file = %s\n", threadId, req->sFileName);////////////////////////////////////
+			if( PERSONAL_LOCK_ACQUIRE != 0){
+				/* non posso eseguire */
+				perror("Personal lock acquire");
+				sendClientError(req->client, UNKNOWN_ERROR);
+				*result = FAILED_STOP;
+			} else {
+				filePtr = TreeFileFind(fileStorage, req->sFileName);
+				if(errno != 0){
+					sendClientError(req->client, UNKNOWN_ERROR);
+					*result = FAILED_STOP;
+				}
+				PERSONAL_FILE_SET(filePtr);
+				PERSONAL_LOCK_RELEASE;
+			}  
+		} else {
+				/* non ho letto il nome */
+				sendClientFatalError(req->client, IMPOSSIBLE_READ);
+				*result = FAILED_STOP;
+		}
+	}
+	return filePtr;
+}
 
 int readFormSocket(int sock, void* buff, int dim){
 	int buffInt;
@@ -801,7 +862,9 @@ void sendClientFatalError(int sock, int err){
 }
 
 
-
+// ret -1 errore
+// ret 0 delayed
+// ret 1 utilizzabile
 int tryUse(ServerFile* filePtr, Request* req, int closeOnFail){
 	
 	if( Pthread_mutex_lock( &(filePtr->lock)) != 0){
@@ -810,7 +873,7 @@ int tryUse(ServerFile* filePtr, Request* req, int closeOnFail){
 		} else {
 			sendClientError(req->client, UNKNOWN_ERROR);
 		}
-		return 0;
+		return -1;
 	}
 	printf("controllo se posso eseguire\n");
 	if(filePtr->flagUse || !fileUsePermitted(req->client, filePtr) ){
@@ -822,15 +885,16 @@ int tryUse(ServerFile* filePtr, Request* req, int closeOnFail){
 			} else {
 				sendClientError(req->client, UNKNOWN_ERROR);
 			}
+			return -1;
 		} else {
-	printf("richiesta in coda\n");//////////////////////////////////////////////////////////
+			printf("richiesta in coda\n");//////////////////////////////////////////////////////////
 			/* richiesta messa in coda */
 			Pthread_mutex_unlock(&(filePtr->lock));
+			return 0;
 		}
-		return 0;
 	} else {
 		/* il thread inizia a gestire il file */
-	printf("inizio gestione file\n");/////////////////////////////////////////////////////////
+		printf("inizio gestione file\n");/////////////////////////////////////////////////////////
 		filePtr->flagUse = 1;
 		Pthread_mutex_unlock(&(filePtr->lock));
 		return 1;

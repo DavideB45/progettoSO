@@ -41,7 +41,7 @@ int isEmpty(FifoList* list){
 // insert in queue
 // ret -> 0 failure 1 success
 _Bool insert(FifoList* list, void* elem){
-	if(list == NULL || elem == NULL){
+	if(list == NULL){
 		return 0;
 	}
 	

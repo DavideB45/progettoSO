@@ -31,6 +31,9 @@ TreeFile* newTreeFile(){
 		return NULL;
 	}
 	
+	newTree->maxFileDim = 0;
+	newTree->maxFileNum = 0;
+
 	newTree->fileCount = 0;
 	newTree->nodeCount = 0;
 	newTree->filedim = 0;
