@@ -12,7 +12,8 @@ int filePtrCompare( const void* file1, const void* file2){
 	return ((ServerFile*) file1) - ((ServerFile*) file2);
 }
 void noOp(void* Ptr){
-	printf("removed %p", Ptr);
+	printf("noOp %p\n", Ptr);
+	fflush(stdout);
 	return;
 }
 
@@ -235,6 +236,8 @@ int disconnectClient(int clientId, ClientTable *tab){
 			errno = EPERM;
 			return -1;
 		}
+		printf("%d chiudo %p\n", clientId,(void*) filePtr);
+		fflush(stdout);
 		generalListRemove(&clientId, (filePtr)->openList);
 		Pthread_mutex_unlock( &((filePtr)->lock) );
 	}

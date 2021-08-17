@@ -47,7 +47,7 @@ _Bool generalListRemove(void* elem, GeneralList* list){
 	}
 	
 	GeneralListNode *precPtr = NULL;
-	if(!( list->compFun(elem, (list->head->elem)) )){
+	if(( list->compFun(elem, (list->head->elem)) ) == 0){
 		//elemento rimosso dalla testa
 		list->head = list->head->nextPtr;
 		if (list->head == NULL){
@@ -57,7 +57,7 @@ _Bool generalListRemove(void* elem, GeneralList* list){
 		free(currPtr);
 		return 1;
 	}
-	while(currPtr != NULL && !( list->compFun( elem, (currPtr->elem) ) )){
+	while(currPtr != NULL && ( list->compFun( elem, (currPtr->elem) ) ) != 0){
 		precPtr = currPtr;
 		currPtr = currPtr->nextPtr;
 	}
@@ -136,7 +136,7 @@ int isInGeneralList(void* elem, GeneralList* list){
 	}
 	
 	GeneralListNode* currPtr = list->head;
-	while (currPtr != NULL && !( list->compFun(currPtr->elem, elem) ) ){
+	while (currPtr != NULL && ( list->compFun(currPtr->elem, elem) ) != 0 ){
 		currPtr = currPtr->nextPtr;
 	}
 	return currPtr != NULL;

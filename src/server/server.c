@@ -978,7 +978,7 @@ int openFile(Request* req, ServerFile** filePtrP){
 				sendClientResult(req->client, &res, sizeof(int));
 				return COMPLETED_STOP;
 			}
-			clientOpen(req->client, &filePtr, TRUE, resourceTable);
+			clientOpen(req->client, &filePtr, FALSE, resourceTable);
 			sendClientResult(req->client, &res, sizeof(int));
 			return COMPLETED_CONT;
 		break;
