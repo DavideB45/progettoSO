@@ -100,17 +100,26 @@ void destroyTreeNode(TreeNode* node);
 
 /* 
 	idee per estire la mutua esclusione
-	.. passare un _Bool per dire se deve eseguire la lock
-	.. creare funzioni particolari noMutex*LRU(TreeFile* tree, TreeNode* node)
-	.. vedere se lock ritorna errori utili
+	..x passare un _Bool per dire se deve eseguire la lock
+	..v creare funzioni particolari noMutex*LRU(TreeFile* tree, TreeNode* node)
+	..x vedere se lock ritorna errori utili
 */
 
+// sposta un file/nodo in testa alla lista LRU
+// 0 success -1 err
 int moveToFrontLRU(TreeFile* tree, TreeNode* node);
 
+// rimuove un nodo dalla LRU
+// lo lascia nell'albero
+// 0 success -1 err
 int removeFromLRU(TreeFile* tree, TreeNode* node);
 
+// inserisce un nodo nella lista LRU
+// 0 success -1 err
 int insertToFrontLRU(TreeFile* tree, TreeNode* node);
 
-int makeSpace();
+// cerca di liberare dimSpace byte di memoria e nFile
+// ritorna 0 successo -1 se non e' stato possibile rimuovere
+int makeSpace(TreeFile* tree, int nFile, int dimSpace);
 
 #endif

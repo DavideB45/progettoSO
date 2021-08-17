@@ -112,6 +112,7 @@ void* generalListPop(GeneralList* list){
 		return NULL;
 	}
 	if (list->head == NULL){
+		errno = 0;
 		return NULL;
 	}
 	GeneralListNode* toRemove = list->head;
@@ -121,6 +122,7 @@ void* generalListPop(GeneralList* list){
 	if (list->head == NULL){
 		list->queue = NULL;
 	}
+	errno = 0;
 	return retVal;
 }
 
@@ -139,14 +141,17 @@ int isInGeneralList(void* elem, GeneralList* list){
 	while (currPtr != NULL && ( list->compFun(currPtr->elem, elem) ) != 0 ){
 		currPtr = currPtr->nextPtr;
 	}
+	errno = 0;
 	return currPtr != NULL;
 }
 
 //1 = empty    0 = not empty
 int isGeneralListEmpty(GeneralList* list){
 	if (list == NULL){
+		errno = EINVAL;
 		return -1;
 	}
+	errno = 0;
 	return list->head == NULL;
 }
 

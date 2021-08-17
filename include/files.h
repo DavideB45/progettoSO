@@ -15,7 +15,7 @@ typedef struct ServerFile{
 	int lockOwner;// cliend ID = Inode del coso per prlarci
 	GeneralList* openList;// client che hanno aperto
 	GeneralList* requestList;// riempita da atri thread
-	int dim;//capire quale deve essere l'unita' di misura
+	int dim;//capire quale deve essere l'unita' di misura e se devo contare i metadati
 	char* data;
 	char* namePath;
 	int creator;

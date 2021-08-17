@@ -318,6 +318,161 @@ void destroyTreeNode(TreeNode* node){
 ///////////////////////////////// REPLACE ///////////////////////////////////////
 
 // deve aggiornare max dim e max n file
-int insertToFrontLRU();
 
-int moveToFrontLRU();
+// controllare che non si abbiano puntatori a file NULL
+
+// funzioni da chiamare dentro la mutua esclusione
+
+// sposta un file/nodo in testa alla lista LRU
+// 0 success -1 err
+int moveToFrontLRU(TreeFile* tree, TreeNode* node){
+	if(node == NULL || tree == NULL || tree->mostRecentLRU == NULL){
+		errno = EINVAL;
+		return -1;
+	}
+
+	if(node->moreRecentLRU == NULL){
+		/* e' gia' la testa */
+		errno = 0;
+		return 0;
+	}
+	
+	if(node->lessRecentLRU == NULL){
+		/* e' il meno rec usato */
+		tree->leastRecentLRU = node->moreRecentLRU;// non succede LRU = NULL
+	} else {
+		node->lessRecentLRU->moreRecentLRU = node->moreRecentLRU;// prec punta succ
+	}
+	node->moreRecentLRU->lessRecentLRU = node->lessRecentLRU;// succ punta prec
+	
+	node->lessRecentLRU = tree->mostRecentLRU;// prec = ex MRU
+	tree->mostRecentLRU->moreRecentLRU = node;// MRU punta a node come MRU
+	tree->mostRecentLRU = node;// diventa MRU
+	node->moreRecentLRU = NULL;
+	
+	errno = 0;
+	return 0;
+}
+
+// rimuove un nodo dalla LRU
+// lo lascia nell'albero
+// 0 success -1 err
+int removeFromLRU(TreeFile* tree, TreeNode* node){
+	if(node == NULL || tree == NULL || node->sFile == NULL){
+		errno = EINVAL;
+		return -1;
+	}
+	// aggiorna spazio
+	(tree->fileCount)--;
+	// nessuno puo' scrivere mentre faccio la remove
+	// No perche' FILE_DELETED e' usato solo quando 
+	// ho la mutua esclusione sul file
+	(tree->filedim) -= node->sFile->dim;
+	
+	if(tree->mostRecentLRU == node){
+		/* era la testa */
+		tree->mostRecentLRU = node->lessRecentLRU;
+		if(node->lessRecentLRU == NULL){
+			/* era l'unico */
+			tree->leastRecentLRU = NULL;
+		} else {
+			/* sistemo nuovo MRU */
+			tree->mostRecentLRU->moreRecentLRU = NULL;
+		}
+		node->lessRecentLRU = NULL;
+		node->moreRecentLRU = NULL;
+		errno = 0;
+		return 0;
+	}
+	
+	if(tree->leastRecentLRU == node){
+		/* era l'ultimo (almeno uno davanti) */
+		tree->leastRecentLRU = node->moreRecentLRU;
+		tree->leastRecentLRU->lessRecentLRU = NULL;
+		node->lessRecentLRU = NULL;
+		node->moreRecentLRU = NULL;
+		errno = 0;
+		return 0;
+	}
+	
+	node->lessRecentLRU->moreRecentLRU = node->moreRecentLRU;
+	node->moreRecentLRU->lessRecentLRU = node->lessRecentLRU;
+	node->lessRecentLRU = NULL;
+	node->moreRecentLRU = NULL;
+	errno = 0;
+	return 0;
+}
+
+// inserisce un nodo nella lista LRU
+// 0 success -1 err
+int insertToFrontLRU(TreeFile* tree, TreeNode* node){
+	if(tree == NULL || node == NULL || node->sFile == NULL){
+		errno = EINVAL;
+		return -1;
+	}
+	(tree->fileCount)++;
+	// nessuno puo' scrivere mentre faccio la remove
+	// perche' da quando il file e' nell'albero
+	// non ho lasciato la lock
+	(tree->filedim) += node->sFile->dim;// la dim sara' 0
+	
+	node->moreRecentLRU = NULL;
+	if(tree->leastRecentLRU == NULL){
+		/* non ci sono file */
+		tree->leastRecentLRU = node;
+		tree->mostRecentLRU = node;
+		tree->leastRecentLRU = NULL;
+		errno = 0;
+		return 0;
+	}
+
+	tree->mostRecentLRU->moreRecentLRU = node;
+	node->lessRecentLRU = tree->mostRecentLRU;
+	tree->mostRecentLRU->moreRecentLRU = node;
+	errno = 0;
+	return 0;
+	
+}
+
+void fakeFree(void* ptr){
+	return;
+}
+
+// cerca di liberare dimSpace byte di memoria e nFile
+// ritorna 0 successo -1 se non e' stato possibile rimuovere
+// modificare con le nuove politiche delle lock
+int makeSpace(TreeFile* tree, int nFile, int dimSpace){
+	if(tree == NULL || nFile < 0 || dimSpace < 0){
+		errno = EINVAL;
+		return -1;
+	}
+	int nVictim = 0;
+	int spaceVictim = 0;
+	TreeNode* currVictim = tree->leastRecentLRU;
+	ServerFile* tempPtr = NULL;
+	GeneralList* listVictim = newGeneralList(fakeComp, fakeFree);
+	if(listVictim == NULL){
+		// errno settato
+		return -1;
+	}
+	while( currVictim != NULL && (nVictim < nFile || spaceVictim < dimSpace) ){
+		if(currVictim->sFile != NULL){// dovrebbe essere sempre vera
+			if( Pthread_mutex_lock( &(currVictim->sFile->lock) ) == 0){
+				if(currVictim->sFile->flagUse == 0){
+					currVictim->sFile->flagUse == 1;
+					generalListInsert( (void*) currVictim->sFile, listVictim);
+					if(errno != 0){
+						// devo sistemare i file 1 alla volta
+						Pthread_mutex_lock( &(currVictim->sFile->lock) );
+
+					}
+					nVictim++;
+					spaceVictim += currVictim->sFile->dim;
+				}
+				Pthread_mutex_unlock( &(currVictim->sFile->lock) );
+			}
+		}
+	}
+	
+	
+}
