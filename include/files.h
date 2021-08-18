@@ -9,7 +9,6 @@
 #include <request.h>
 
 typedef struct ServerFile{
-	pthread_mutex_t lock;
 	_Bool flagUse;// un thread lo sta gestendo
 	_Bool flagO_lock;
 	int lockOwner;// cliend ID = Inode del coso per prlarci
@@ -42,11 +41,6 @@ int lockFile(ServerFile* obj, int locker);
 //ritorna 1 successo ritorna 0 altrimenti
 int unlockFile(ServerFile* obj, int locker);
 
-//da migliorare
-int startMutex(ServerFile* obj);
-
-//da mogliorare
-int endMutex(ServerFile* obj);
 
 //aggiunge una richiersta alla coda delle richieste del file
 //ritorna 1 successo ritorna numeri > 1 altrimenti

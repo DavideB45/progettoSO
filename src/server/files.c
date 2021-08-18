@@ -61,16 +61,10 @@ ServerFile* newServerFile(int creator, int O_lock, char* nameP){
 		newFile->flagUse = 1;// poi continuero' a eseguire richieste sul file
 	}
 	
-	if( Pthread_mutex_init( &(newFile->lock) ) != 0){
-		free(newFile);
-		errno = EPERM;
-		return NULL;
-	}
 	
 	newFile->openList = newGeneralList( intCompare, free);
 	if (newFile->openList == NULL){
 		//non ho creato openList
-		pthread_mutex_destroy( &(newFile->lock) );
 		free(newFile);
 		errno = ENOMEM;
 		return NULL;
@@ -78,7 +72,6 @@ ServerFile* newServerFile(int creator, int O_lock, char* nameP){
 	int* newOpen = malloc(sizeof(int));
 	if(newOpen == NULL){
 		generalListDestroy(newFile->openList);
-		pthread_mutex_destroy( &(newFile->lock) );
 		free(newFile);
 		errno = ENOMEM;
 		return NULL;
@@ -91,7 +84,6 @@ ServerFile* newServerFile(int creator, int O_lock, char* nameP){
 	if(newFile->requestList == NULL){
 		//non ho creato requestList
 		free(newOpen);
-		pthread_mutex_destroy( &(newFile->lock) );
 		free(newFile);
 		generalListDestroy(newFile->openList);
 		errno = ENOMEM;
@@ -105,7 +97,6 @@ void destroyServerFile(ServerFile* obj){
 	if(obj == NULL)
 		return;
 	
-	pthread_mutex_destroy( &(obj->lock) );
 	generalListDestroy(obj->openList);
 	generalListDestroy(obj->requestList);
 	free(obj->data);
@@ -153,20 +144,6 @@ int unlockFile(ServerFile* obj, int locker){
 	} else {
 		return 0;
 	}
-}
-
-int startMutex(ServerFile* obj){
-	if(obj == NULL){
-		return -1;
-	}
-	return Pthread_mutex_lock( &(obj->lock) );
-}
-
-int endMutex(ServerFile* obj){
-	if(obj == NULL){
-		return -1;
-	}
-	return Pthread_mutex_unlock( &(obj->lock) );
 }
 
 int addRequest(ServerFile *obj, Request* richiesta){

@@ -8,11 +8,22 @@
 #include <pthread.h>
 #include <errno.h>
 #include <unistd.h>
+#include <string.h>
 
 
 int intCompare(const void* A,const void* B){
 	printf("%d == %d\n", *((int*) A), *((int*) B));
 	return *((int*) A) - *((int*) B);
+}
+
+char* duplicateString(char* toDup){
+	int len = strlen(toDup) + 1;
+	char* toRet = malloc(len*sizeof(char));
+	if(toRet == NULL){
+		return NULL;
+	}
+	strcpy(toRet, toDup);
+	return toRet;
 }
 
 /** Evita letture parziali

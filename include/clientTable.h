@@ -6,18 +6,16 @@
 #define BASEDIM 20
 
 #include <generalList.h> 
+#include <tree.h>
 #include <files.h>
 
 typedef struct _clientInfo{
 	pthread_mutex_t lock;
 	int id;
-	// li aggiorno dopo una remove
-	// se si client chiude dopo una delete? : lock per tutta la tabella
-	// posso creare una richiesta da parte del server
 	// 
 	// prima di destroyFlie() nessuno lo puo' avere aperto
-	GeneralList* fileInUse;
-	GeneralList* fileLocked;
+	GeneralList* nodeInUse;
+	GeneralList* nodeLocked;
 	struct _clientInfo* next;
 }ClientInfo;
 
@@ -36,11 +34,11 @@ int newClient(int clientId, ClientTable *tab);
 
 // mette file nella lista Open
 // se non ottengo mutua esclusione non lo metto
-int clientOpen(int clientId, ServerFile** filePtr, int O_Lock, ClientTable* tab);
+int clientOpen(int clientId, TreeNode* nodePtr, int O_Lock, ClientTable* tab);
 
 // mette file nella lista lock
 // se non ottengo mutua esclusione non lo metto
-int clientLock(int clientId,  ServerFile** filePtr, ClientTable* tab);
+int clientLock(int clientId, TreeNode* nodePtr, ClientTable* tab);
 
 
 
@@ -51,15 +49,15 @@ int disconnectClient(int clientId, ClientTable *tab);
 // toglie file dalla lista close
 // se non ottengono la mutua esclusione lo lasciano aperto
 // rischio segFault distruggo la struct client o termino
-int clientClose(int clientId, ServerFile** filePtr, int O_Lock, ClientTable* tab);
+int clientClose(int clientId, TreeNode* nodePtr, int O_Lock, ClientTable* tab);
 
 // toglie file da lista lock
 // se non ottengono mutua esclusione 
 // rischio segFault chiudo client (il prossimo avra' qualche file gia' locked)
-int clientUnlock(int clientId, ServerFile** filePtr, ClientTable* tab);
+int clientUnlock(int clientId, TreeNode* nodePtr, ClientTable* tab);
 
 // dopo la rimozione di un file viene chiuso a tutti per evitare segFault
-int clientFileDel( ServerFile** filePtr, ClientTable* tab);
+int clientFileDel( TreeNode* nodePtr, ClientTable* tab, ServerFile* filePtr);
 
 // restituisce il posto nell'array in cui sta il client
 int clientBucket(int clientId);

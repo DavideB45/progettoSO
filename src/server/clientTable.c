@@ -1,6 +1,7 @@
 #include <clientTable.h>
 #include <generalList.h> 
 #include <files.h>
+#include <tree.h>
 #include <utils.h>
 
 #include <errno.h>
@@ -8,8 +9,8 @@
 #include <stdio.h>
 
 
-int filePtrCompare( const void* file1, const void* file2){
-	return ((ServerFile*) file1) - ((ServerFile*) file2);
+int nodePtrCompare( const void* node1, const void* node2){
+	return ((TreeNode*) node1) - ((TreeNode*) node2);
 }
 void noOp(void* Ptr){
 	printf("noOp %p\n", Ptr);
@@ -108,17 +109,17 @@ int newClient(int clientId, ClientTable *tab){
 			errno = EPERM;
 			return -1;
 		}
-		new_Client->fileLocked = newGeneralList(filePtrCompare, noOp);
-		if(new_Client->fileLocked == NULL){
+		new_Client->nodeLocked = newGeneralList(nodePtrCompare, noOp);
+		if(new_Client->nodeLocked == NULL){
 			pthread_mutex_destroy( &(new_Client->lock) );
 			free(new_Client);
 			Pthread_mutex_unlock( &(tab->lock ) );
 			errno = ENOMEM;
 			return -1;
 		}
-		new_Client->fileInUse = newGeneralList(filePtrCompare, noOp);
-		if(new_Client->fileInUse == NULL){
-			generalListDestroy(new_Client->fileLocked);
+		new_Client->nodeInUse = newGeneralList(nodePtrCompare, noOp);
+		if(new_Client->nodeInUse == NULL){
+			generalListDestroy(new_Client->nodeLocked);
 			pthread_mutex_destroy( &(new_Client->lock) );
 			free(new_Client);
 			Pthread_mutex_unlock( &(tab->lock ) );
@@ -140,7 +141,7 @@ int newClient(int clientId, ClientTable *tab){
 // mette file nella lista Open
 // se non ottengo mutua esclusione non lo metto
 // ritorna -1 errore 0 successo
-int clientOpen(int clientId, ServerFile** filePtr, int O_Lock, ClientTable* tab){
+int clientOpen(int clientId, TreeNode* nodePtr, int O_Lock, ClientTable* tab){
 	ClientInfo* clientPtr = clientGet(clientId, tab);
 	if(clientPtr == NULL){
 		// errno settato da clientGet
@@ -150,18 +151,18 @@ int clientOpen(int clientId, ServerFile** filePtr, int O_Lock, ClientTable* tab)
 		errno = EPERM;
 		return -1;
 	}
-	if(!isInGeneralList((void*) *filePtr, clientPtr->fileInUse)){
-		if(!generalListInsert((void*) *filePtr, clientPtr->fileInUse)){
+	if(!isInGeneralList((void*) nodePtr, clientPtr->nodeInUse)){
+		if(!generalListInsert((void*) nodePtr, clientPtr->nodeInUse)){
 			int err = errno;
 			Pthread_mutex_unlock( &(clientPtr->lock) );
 			errno = err;
 			return -1;
 		}
 	}
-	if((O_Lock == 1) && !isInGeneralList((void*) *filePtr, clientPtr->fileLocked)){
-		if(!generalListInsert((void*) *filePtr, clientPtr->fileLocked)){
+	if((O_Lock == 1) && !isInGeneralList((void*) nodePtr, clientPtr->nodeLocked)){
+		if(!generalListInsert((void*) nodePtr, clientPtr->nodeLocked)){
 			int err = errno;
-			generalListRemove((void*) *filePtr, clientPtr->fileInUse);
+			generalListRemove((void*) nodePtr, clientPtr->nodeInUse);
 			Pthread_mutex_unlock( &(clientPtr->lock) );
 			errno = err;
 			return -1;
@@ -175,7 +176,7 @@ int clientOpen(int clientId, ServerFile** filePtr, int O_Lock, ClientTable* tab)
 // mette file nella lista lock
 // se non ottengo mutua esclusione non lo metto
 // return -1 fail 0 success setta errno
-int clientLock(int clientId, ServerFile** filePtr, ClientTable* tab){
+int clientLock(int clientId, TreeNode* nodePtr, ClientTable* tab){
 	ClientInfo* clientPtr = clientGet(clientId, tab);
 	if(clientPtr == NULL){
 		// errno settato da clientGet
@@ -185,8 +186,8 @@ int clientLock(int clientId, ServerFile** filePtr, ClientTable* tab){
 		errno = EPERM;
 		return -1;
 	}
-	if(!isInGeneralList((void*) *filePtr, clientPtr->fileLocked)){
-		if(!generalListInsert((void*) *filePtr, clientPtr->fileLocked)){
+	if(!isInGeneralList((void*) nodePtr, clientPtr->nodeLocked)){
+		if(!generalListInsert((void*) nodePtr, clientPtr->nodeLocked)){
 			int err = errno;
 			Pthread_mutex_unlock( &(clientPtr->lock) );
 			errno = err;
@@ -218,28 +219,28 @@ int disconnectClient(int clientId, ClientTable *tab){
 		errno = EPERM;
 		return -1;
 	}
-	ServerFile* filePtr = NULL;
+	TreeNode* nodePtr = NULL;
 	// rimuovo la lock dai file su cui il client aveva la mutua esclusione
-	while(filePtr = generalListPop(clientPtr->fileLocked), filePtr != NULL){
-		if( Pthread_mutex_lock( &((filePtr)->lock) ) != 0){
+	while(nodePtr = generalListPop(clientPtr->nodeLocked), nodePtr != NULL){
+		if( Pthread_mutex_lock( &((nodePtr)->lock) ) != 0){
 			errno = EPERM;
 			return -1;
 		}
-		(filePtr)->flagO_lock = 0;
-		generalListRemove(&clientId, (filePtr)->openList);
-		generalListRemove(filePtr, clientPtr->fileInUse);
-		Pthread_mutex_unlock( &((filePtr)->lock) );
+		(nodePtr)->sFile->flagO_lock = 0;
+		generalListRemove(&clientId, (nodePtr)->sFile->openList);
+		generalListRemove(nodePtr, clientPtr->nodeInUse);
+		Pthread_mutex_unlock( &((nodePtr)->lock) );
 	}
 	// chiudo i file non chiusi
-	while(filePtr = generalListPop(clientPtr->fileInUse), filePtr != NULL){
-		if( Pthread_mutex_lock( &((filePtr)->lock) ) != 0){
+	while(nodePtr = generalListPop(clientPtr->nodeInUse), nodePtr != NULL){
+		if( Pthread_mutex_lock( &((nodePtr)->lock) ) != 0){
 			errno = EPERM;
 			return -1;
 		}
-		printf("%d chiudo %p\n", clientId,(void*) filePtr);
+		printf("%d chiudo %p\n", clientId,(void*) nodePtr);
 		fflush(stdout);
-		generalListRemove(&clientId, (filePtr)->openList);
-		Pthread_mutex_unlock( &((filePtr)->lock) );
+		generalListRemove(&clientId, (nodePtr)->sFile->openList);
+		Pthread_mutex_unlock( &((nodePtr)->lock) );
 	}
 	Pthread_mutex_unlock( &(clientPtr->lock) );
 	Pthread_mutex_unlock( &(tab->lock) );
@@ -251,7 +252,7 @@ int disconnectClient(int clientId, ClientTable *tab){
 // toglie file dalla lista close di clientId
 // se non ottengono la mutua esclusione termino / chiudo client e rifaccio struct
 // return -1 fail 0 success setta errno
-int clientClose(int clientId, ServerFile** filePtr, int O_Lock, ClientTable* tab){
+int clientClose(int clientId, TreeNode* nodePtr, int O_Lock, ClientTable* tab){
 	ClientInfo* clientPtr = clientGet(clientId, tab);
 	if(clientPtr == NULL){
 		// errno settato da clientGet
@@ -261,9 +262,9 @@ int clientClose(int clientId, ServerFile** filePtr, int O_Lock, ClientTable* tab
 		errno = EPERM;
 		return -1;
 	}
-	generalListRemove(*filePtr, clientPtr->fileInUse);
+	generalListRemove(nodePtr, clientPtr->nodeInUse);
 	if(O_Lock == 1){
-		generalListRemove(*filePtr, clientPtr->fileLocked);
+		generalListRemove(nodePtr, clientPtr->nodeLocked);
 	}
 	Pthread_mutex_unlock( &(clientPtr->lock) );
 	
@@ -274,7 +275,7 @@ int clientClose(int clientId, ServerFile** filePtr, int O_Lock, ClientTable* tab
 // toglie file da lista lock
 // se non ottengono mutua esclusione termino / chiudo client e rifaccio struct
 // return -1 fail 0 success setta errno
-int clientUnlock(int clientId, ServerFile** filePtr, ClientTable* tab){
+int clientUnlock(int clientId, TreeNode* nodePtr, ClientTable* tab){
 	ClientInfo* clientPtr = clientGet(clientId, tab);
 	if(clientPtr == NULL){
 		// errno settato da clientGet
@@ -284,7 +285,7 @@ int clientUnlock(int clientId, ServerFile** filePtr, ClientTable* tab){
 		errno = EPERM;
 		return -1;
 	}
-	generalListRemove(*filePtr, clientPtr->fileLocked);
+	generalListRemove(nodePtr, clientPtr->nodeLocked);
 	Pthread_mutex_unlock( &(clientPtr->lock) );
 	
 	errno = 0;
@@ -295,43 +296,41 @@ int clientUnlock(int clientId, ServerFile** filePtr, ClientTable* tab){
 // se fallisce devo terminare il server
 // da chiamare come ultima funzione di rimozione qunado nessuno ha puntatori a questo file
 // return -1 fail 0 success setta errno
-int clientFileDel(ServerFile** filePtr, ClientTable* tab){
+int clientFileDel(TreeNode* nodePtr, ClientTable* tab, ServerFile* filePtr){
+	
 	if( Pthread_mutex_lock( &(tab->lock) ) != 0){
 		errno = EPERM;
 		return -1;
 	}
-	// non controllo errori perche' posso continuare senza mutua esclusione
-	Pthread_mutex_lock( &((*filePtr)->lock) );
+	// non chiamo lock su file (chiamata da chi vuolerimuovere il file)
 	int* clientId = NULL;
 	ClientInfo* clientPtr;
-	while(clientId = generalListPop( (*filePtr)->openList ), clientId != NULL){
+	while(clientId = generalListPop( filePtr->openList ), clientId != NULL){
 		// non posso chiamare clientClose perche' perderei mutua esclusione
 		clientPtr = clientGetNoLock(*clientId, tab);
 		if(clientPtr != NULL){
 			// se avanza tempo chiudere il client e non terminare completamente
 			if( Pthread_mutex_lock( &(clientPtr->lock) ) != 0){
 				Pthread_mutex_unlock( &(tab->lock) );
-				Pthread_mutex_unlock( &((*filePtr)->lock) );
 				errno = EPERM;
 				return -1;
 			}
-			generalListRemove( (void*) *filePtr, clientPtr->fileInUse );
+			generalListRemove( (void*) nodePtr, clientPtr->nodeInUse );
 			Pthread_mutex_unlock( &(clientPtr->lock) );
 		}
+		free(clientId);
 	}
-	if( (*filePtr)->flagO_lock == 1){
-		clientPtr = clientGetNoLock(  (*filePtr)->lockOwner , tab);
+	if( filePtr->flagO_lock == 1){
+		clientPtr = clientGetNoLock(  filePtr->lockOwner , tab);
 		if( Pthread_mutex_lock( &(clientPtr->lock) ) != 0){
 			Pthread_mutex_unlock( &(tab->lock) );
-			Pthread_mutex_unlock( &((*filePtr)->lock) );
 			errno = EPERM;
 			return -1;
 		}
-		generalListRemove( (void*) *filePtr, clientPtr->fileLocked );
+		generalListRemove( (void*) nodePtr, clientPtr->nodeLocked );
 		Pthread_mutex_unlock( &(clientPtr->lock) );
 	}
 	Pthread_mutex_unlock( &(tab->lock) );
-	Pthread_mutex_unlock( &((*filePtr)->lock) );
 	errno = 0;
 	return 0;
 }

@@ -4,18 +4,17 @@
 #pragma once
 
 #include <pthread.h>
-// #include <files.h>
-#include "files.h"
-
+#include <files.h>
 
 
 typedef struct TreeNode{
+	pthread_mutex_t lock;
+
 	struct TreeNode* leftPtr;
 	struct TreeNode* rightPtr;
 	struct TreeNode* moreRecentLRU;
 	struct TreeNode* lessRecentLRU;
 
-	_Bool flagReal;// 0 => tutto NULL tranne elementi neccessari per funzionamento albero
 	char* name;
 	ServerFile *sFile;
 }TreeNode;
@@ -29,7 +28,6 @@ typedef struct TreeFile{
 	int maxFileNum;
 	int maxFileDim;
 
-	int nodeCount;
 	int fileCount;
 	int filedim;
 	TreeNode* root;
@@ -57,20 +55,21 @@ int startMutexTreeFile(TreeFile* tree);
 int endMutexTreeFile(TreeFile* tree);
 
 // inserisce il nuovo nodo nell'albero
-// inserzione riuscita = 1   alreadyExist = 0
-// errori Node = 2   nullTree = 3   noLock = 4
+// ritorna una lista di file rimossi per fare spazio
+// puo' ritornare NUll anche in caso di successo
+// setta errno
 // insert non garantice che il puntatore al nodo sia lo stesso
-int TreeFileinsert(TreeFile* tree , TreeNode* newNode);
+TreeNode* TreeFileinsert(TreeFile* tree , TreeNode** newNode, ServerFile** removed);
 
 // rimuove un nodo e ritorna il puntatore al file che conteneva
 // NULL -> non trovato/bad address
 // setta errno
-ServerFile* TreeFileRemove(TreeFile* tree, char* name);
+ServerFile* TreeFileRemove(TreeFile* tree, TreeNode* node);
 
 // trova e ritorna il file identificato con nome
 // ritorna puntatore al file
 // NULL = non trovato / bad address
-ServerFile* TreeFileFind(TreeFile* tree, char* name);
+TreeNode* TreeFileFind(TreeFile* tree, char* name);
 
 // getNElements
 // restituisce un puntatore ad un 
@@ -119,7 +118,8 @@ int removeFromLRU(TreeFile* tree, TreeNode* node);
 int insertToFrontLRU(TreeFile* tree, TreeNode* node);
 
 // cerca di liberare dimSpace byte di memoria e nFile
-// ritorna 0 successo -1 se non e' stato possibile rimuovere
-int makeSpace(TreeFile* tree, int nFile, int dimSpace);
+// ritorna una lista di nodi contenti i file da rimuovere
+// modificare con le nuove politiche delle lock
+GeneralList* makeSpace(TreeFile* tree, int nFile, int dimSpace);
 
 #endif
