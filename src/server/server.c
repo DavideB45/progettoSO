@@ -137,7 +137,6 @@ int initServer(void){
 	resourceTable = newClientTable();
 	logQueue = newList();
 	readConfig("./servWork/file_config");
-
 	// creo una pipe
 	// [1] per scrivere [0] per leggere
 	if(pipe(srvGen.doneReq) == -1){
@@ -331,8 +330,10 @@ void* dispatcher(void){
 
 void readConfig(char* indirizzo){
 	
-	srvGen.maxFileNum = 10;
-	srvGen.maxFileDim = 30;
+
+	
+	fileStorage->maxFileDim = 30;
+	fileStorage->maxFileNum = 10;
 	srvGen.n_worker    = 3;
 
 	FILE * filePtr = NULL;
@@ -365,13 +366,13 @@ void readConfig(char* indirizzo){
 
 		if(fscanf(filePtr, "%*[_max_file]%*[ :=\t]%d\n", &num) == 1){
 			if(num > 0){
-				srvGen.maxFileNum = num;
+				fileStorage->maxFileNum = num;
 			}
 		}
 
 		if(fscanf(filePtr, "%*[_max_dim]%*[ :=\t]%d%*[\n MbBm]", &num) == 1){
 			if(num > 0){
-				srvGen.maxFileDim = num;
+				fileStorage->maxFileDim = num;
 			}
 		}
 		
@@ -421,21 +422,12 @@ void readConfig(char* indirizzo){
 			perror("malloc threadUse");
 			exit(EXIT_FAILURE);
 		}
-		if( Pthread_mutex_init( &(srvGen.threadUse[i]->lock) ) != 0){
-			perror("mutex init threadUse");
-			exit(EXIT_FAILURE);
-		}
-		if(pthread_cond_init(&(srvGen.threadUse[i]->completedReq), NULL) != 0){
-			perror("cond init threadUse");
-			exit(EXIT_FAILURE);
-		}
-		srvGen.threadUse[i]->filePtr = NULL;
 	}
 	printf("worker : %d\n", srvGen.n_worker);
 
-	printf("maxFil : %d\n", srvGen.maxFileNum);
+	printf("maxFil : %d\n", fileStorage->maxFileNum);
 	
-	printf("maxDim : %d\n", srvGen.maxFileDim);
+	printf("maxDim : %d\n", fileStorage->maxFileDim);
 
 	printf("nameSo : %s\n", srvGen.sockName);
 
@@ -476,7 +468,11 @@ void* logThread(void* arg){
 			}
 		}
 		if(LRU_REPLACE(toWrite)){
-			fprintf(filePtr, "file rem = %d freed mem = %d", FILE_REMOVED(toWrite), FREED_MEMORY(toWrite));
+			if(FILE_REMOVED(toWrite) == 1 && toWrite->fileName != NULL){
+				fprintf(filePtr, "file rem = %s freed mem = %d  | ", toWrite->fileName, FREED_MEMORY(toWrite));
+			} else {
+				fprintf(filePtr, "file rem = %d freed mem = %d | ", FILE_REMOVED(toWrite), FREED_MEMORY(toWrite));
+			}
 		}
 		if(LRU_NEW_MAX(toWrite)){
 			switch(NEW_MAX_TIPE(toWrite)){
@@ -492,7 +488,7 @@ void* logThread(void* arg){
 			}
 		}
 		if(SERV_CLOSE(toWrite)){
-			fprintf(filePtr, "%d : N file = %d DIM tot = %d",toWrite->client, FILE_REMANING(toWrite), SPACE_USE(toWrite));
+			fprintf(filePtr, "%d : N file = %d DIM tot = %d | ",toWrite->client, FILE_REMANING(toWrite), SPACE_USE(toWrite));
 		}
 		
 		
@@ -684,6 +680,8 @@ void manageRequest(Request* req, int threadId){
 		removeFile(req, nodePtr);
 	}
 	
+	
+
 	// destroy req
 	return;
 }
@@ -863,19 +861,23 @@ int openFile(Request* req, TreeNode** nodePtrP){
 		case EEXIST:
 			sendClientError(req->client, FILE_ALREADY_EXISTS);
 			destroyTreeNode(nodePtr);
-			destroyServerFile(filePtr);
 			return FAILED_STOP;
 		break;
 		case 0:;
 			int res = SUCCESS;
 			*nodePtrP = nodePtr;
 			if(toRemove != NULL && expelled != NULL){
+				LOG_INSERT(newLogOp(REMOVE_FILE, duplicateString(expelled->namePath), LRU_ALG, 1, 0, 1));
 				clientFileDel(toRemove, resourceTable, expelled);
 				informClientDelete(expelled);
 				destroyServerFile(expelled);
 			}
 			if(GET_O_LOCK(req->oper)){
 				clientOpen(req->client, nodePtr, TRUE, resourceTable);
+				if( Pthread_mutex_lock( &(nodePtr->lock) ) == 0){ 
+					nodePtr->sFile->flagUse = 0;
+					Pthread_mutex_unlock( &(nodePtr->lock) );
+				}
 				sendClientResult(req->client, &res, sizeof(int));
 				return COMPLETED_STOP;
 			}
@@ -886,24 +888,22 @@ int openFile(Request* req, TreeNode** nodePtrP){
 		case ENOMEM:
 			sendClientError(req->client, NO_MEMORY);
 			destroyTreeNode(nodePtr);
-			destroyServerFile(filePtr);
 			return FAILED_STOP;
 		break;
 		case EPERM:
 			if(toRemove != NULL && expelled != NULL){
+				LOG_INSERT(newLogOp(REMOVE_FILE, duplicateString(expelled->namePath), LRU_ALG, 1, 0, 1));
 				clientFileDel(toRemove, resourceTable, expelled);
 				informClientDelete(expelled);
 				destroyServerFile(expelled);
 			}
 			sendClientError(req->client, UNKNOWN_ERROR);
 			destroyTreeNode(nodePtr);
-			destroyServerFile(filePtr);
 			return FAILED_STOP;
 		break;
 		default:
 			sendClientError(req->client, UNKNOWN_ERROR);
 			destroyTreeNode(nodePtr);
-			destroyServerFile(filePtr);
 			return FAILED_STOP;
 		break;
 		}
@@ -929,7 +929,9 @@ int openFile(Request* req, TreeNode** nodePtrP){
 	}
 	// chiedo la lock
 	if(GET_O_LOCK(req->oper)){
+		clientOpen(req->client, nodePtr, TRUE, resourceTable);
 		if( Pthread_mutex_lock( &(nodePtr->lock) ) != 0){
+			clientClose(req->client, nodePtr, TRUE, resourceTable);
 			generalListRemove(client_, nodePtr->sFile->openList);
 			sendClientError(req->client, UNKNOWN_ERROR);
 			// free(client_);
@@ -939,7 +941,6 @@ int openFile(Request* req, TreeNode** nodePtrP){
 		nodePtr->sFile->flagUse = 0;
 		nodePtr->sFile->lockOwner = req->client;
 		int reply = SUCCESS;
-		clientOpen(req->client, nodePtr, TRUE, resourceTable);
 		sendClientResult(req->client, &reply, sizeof(int));
 		Pthread_mutex_unlock( &(nodePtr->lock) );
 		return COMPLETED_STOP;
@@ -948,10 +949,11 @@ int openFile(Request* req, TreeNode** nodePtrP){
 	// era gia' locked
 	int reply = SUCCESS;
 	if(nodePtr->sFile->flagO_lock == 1){
-		Pthread_mutex_lock( &(nodePtr->lock) );///////non so come gestire un errore (rimuovere file?)
-		nodePtr->sFile->flagUse = 0;
-		Pthread_mutex_unlock( &(nodePtr->lock) );
 		clientOpen(req->client, nodePtr, TRUE, resourceTable);
+		if( Pthread_mutex_lock( &(nodePtr->lock) ) == 0){ 
+			nodePtr->sFile->flagUse = 0;
+			Pthread_mutex_unlock( &(nodePtr->lock) );
+		}
 		sendClientResult(req->client, &reply, sizeof(int));
 		return COMPLETED_STOP;
 	}

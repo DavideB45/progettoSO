@@ -37,9 +37,6 @@ enum operResult{
 
 typedef struct trhreadInfo{
 	pthread_t thread;
-	pthread_mutex_t lock;// per accedere al filePtr
-	pthread_cond_t completedReq;// signal quando finisce l'operazione
-	ServerFile* filePtr;// su cosa opera
 }ThreadInfo;
 
 

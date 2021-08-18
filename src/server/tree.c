@@ -151,6 +151,7 @@ TreeNode* TreeFileinsert(TreeFile* tree , TreeNode** newNode, ServerFile** remov
 	GeneralList* toRemove = NULL;
 	if(tree->fileCount == tree->maxFileNum){
 		toRemove = makeSpace(tree, 1, 0);
+		printf("to remove %p\n", (void*) toRemove);
 		if(toRemove == NULL){
 			endMutexTreeFile(tree);
 			errno = ENOMEM;
@@ -332,7 +333,7 @@ TreeNode* newTreeNode(ServerFile* sFile, char* name){
 		errno = ENOMEM;
 		return NULL;
 	}
-	newNode->name = strcpy(newNode->name, name);
+	newNode->name = strncpy(newNode->name, name, nameL + 1);
 	return newNode;
 }
 
@@ -459,12 +460,11 @@ int insertToFrontLRU(TreeFile* tree, TreeNode* node){
 		/* non ci sono file */
 		tree->leastRecentLRU = node;
 		tree->mostRecentLRU = node;
-		tree->leastRecentLRU = NULL;
+		node->lessRecentLRU = NULL;
 		errno = 0;
 		return 0;
 	}
 
-	tree->mostRecentLRU->moreRecentLRU = node;
 	node->lessRecentLRU = tree->mostRecentLRU;
 	tree->mostRecentLRU->moreRecentLRU = node;
 	errno = 0;
