@@ -49,12 +49,13 @@ volatile __sig_atomic_t serverStatus;
 void readConfig(char* indirizzo);
 int initServer(void);
 int createThreads(void);
+void collectThreads(void);
 
 void exitFun(void);
 void sigIntQuit(int);
 void sigHup(int);
 
-void* dispatcher(void);
+void dispatcher(void);
 // ritorna il massimo FD da ascoltare
 int updatemax(fd_set set, int maxFD);
 
@@ -134,16 +135,16 @@ int main(int argc, char* argv[]){
 	}
 
 	if(createThreads() != 0){
-	
+		exit(1);
 	}
 	// sistemare i segnali
 	// riattivare i segnali
 	// mettere atExit
 	atexit(exitFun);
 	
-
 	dispatcher();
 
+	collectThreads();
 }
 
 int initServer(void){
@@ -222,17 +223,30 @@ int createThreads(void){
 	return 0;
 }
 
-void exitFun(void){
-	for(int i = 0; i < srvGen.n_worker; i++){
-		pthread_join(srvGen.threadUse[i]->thread, NULL);
-		free(srvGen.threadUse[i]);
+void collectThreads(void){
+	int nullSended = 0;
+	for(size_t i = 0; i < srvGen.n_worker; i++){
+		nullSended += insert(srvGen.toServe, NULL);
 	}
+	if(nullSended >= srvGen.n_worker){
+		for(int i = 0; i < srvGen.n_worker; i++){
+			pthread_join(srvGen.threadUse[i]->thread, NULL);
+			free(srvGen.threadUse[i]);
+		}
+	}
+	LogOp* endLog = newLogOp(0, NULL, SERVER, 0, 0, 0, 0);
+	if(insert(logQueue, endLog) == 0){
+		destroyLogOp(endLog);
+	} else {
+		pthread_join(srvGen.threadLog, NULL);
+	}
+}
+
+void exitFun(void){
+	
 	free(srvGen.threadUse);
 	destroyList(srvGen.toServe, free);
-	
 	destroyClientTable(resourceTable);
-	LOG_INSERT(newLogOp(0, NULL, SERVER, 0, 0, 0, 0));
-	pthread_join(srvGen.threadLog, NULL);
 	destroyTreeFile(fileStorage);
 	destroyList(logQueue, destroyLogOp);
 	free(srvGen.logName);
@@ -248,7 +262,7 @@ void sigHup(int signal){
 	serverStatus = S_SLOW_CLOSE;
 }
 
-void* dispatcher(void){
+void dispatcher(void){
 	
 	int maxFD = SOCKET_FD > srvGen.doneReq[0] ? SOCKET_FD : srvGen.doneReq[0];
 	int newConn;
@@ -262,7 +276,12 @@ void* dispatcher(void){
 	FD_SET(srvGen.doneReq[0], &set);
 	
 
-	while(serverStatus == S_WORKING){
+	while(serverStatus == S_WORKING || (serverStatus == S_SLOW_CLOSE && srvGen.clientNum > 0) ){
+		if(serverStatus == S_SLOW_CLOSE){
+			FD_CLR(SOCKET_FD, &set);
+			if(maxFD == SOCKET_FD)
+				maxFD = updatemax(set, maxFD);
+		}
 		rdSet = set;
 		// se qualcosa non funziona con le interruzioni provare pselect
 		
@@ -270,12 +289,9 @@ void* dispatcher(void){
 		if(nReady == -1){
 			/* SELECT ERROR */
 			if(errno != EINTR){
-				exit(1);
-			} else {
-		/* mettere gestione della chiusura corretta in base allo stato del server dopo il segnale */
-				continue;
+				serverStatus = S_FAST_CLOSE;
 			}
-		}
+		} else {
 		for(size_t fd = 0; fd <= maxFD; fd++){
 			if(FD_ISSET(fd, &rdSet)){
 				if(fd == SOCKET_FD){
@@ -287,27 +303,31 @@ void* dispatcher(void){
 						case EBADF:
 							//fd non valido
 							//continuo fino a che ho qualcuno da servire
+							serverStatus = S_SLOW_CLOSE;
 							FD_CLR(SOCKET_FD, &set);
 							if(maxFD == SOCKET_FD)
 								maxFD = updatemax(set, maxFD);
-				/* mettere il server in uno stato S_SLOW_CLOSE*/
 						break;
 						case EINTR:
 							/* interrupt */
-		/* mettere gestione della chiusura corretta in base allo stato del server dopo il segnale */
+							fd = maxFD + 10;
 						break;
 						case EMFILE:
 							/* max file opened */
 							continue;
 						break;
 						default:
-							/* errori gravi */
-							exit(1);
+							serverStatus = S_SLOW_CLOSE;
+							FD_CLR(SOCKET_FD, &set);
+							if(maxFD == SOCKET_FD)
+								maxFD = updatemax(set, maxFD);
 						break;
 						}
 					} else {
 						if(newConn > 1023){
-							/* fd troppo grande per poll */
+							/* fd troppo grande per select */
+							int ret = SERVER_FULL;
+							writen(newConn, &ret, sizeof(int));
 							close(newConn);
 						} else {
 							/* METTO NUOVO CLIENT NELLA MASCHERA */
@@ -327,7 +347,7 @@ void* dispatcher(void){
 							case -1:
 								// errore generico
 								// la pipe e' rovinata
-								exit(1);
+								serverStatus = S_FAST_CLOSE;
 							break;
 							case  0:
 								// pipe chiusa (non la guardo piu')
@@ -356,14 +376,14 @@ void* dispatcher(void){
 						}
 					} else {
 						/* RICHIESTA DA CLIENT */
-						FD_CLR(fd, &set);
-						if(maxFD == fd)
-							maxFD = updatemax(set, maxFD);
 						request = malloc(sizeof(int));
 						if(request == NULL){
 							perror("no mem");
-							exit(1);
+							break;
 						}
+						FD_CLR(fd, &set);
+						if(maxFD == fd)
+							maxFD = updatemax(set, maxFD);
 						*request = fd;
 						if( insert(srvGen.toServe, (void*) request) == 0){
 							printf("Fifo error\n");
@@ -376,9 +396,10 @@ void* dispatcher(void){
 			}
 			
 		}
+		}
 		
 	}	
-	return NULL;
+	return;
 }
 
 void readConfig(char* indirizzo){

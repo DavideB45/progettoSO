@@ -28,13 +28,21 @@ int main(void){
 	}
 	printf("\n");
 	
-	time_t now = time(NULL);
-	char* tempo = ctime( &now );
-	printf("%sl\n", tempo);
-	tempo = operatToString(3, 0);
-	printf("%s %+d | ", tempo, -2);
-	FILE* fPtr = fopen("./servWork/piccione", "a+");
-	printf("%d\n", fprintf(fPtr, "tre %d\n", 3));
+
+	for(int i = 0; i < 20; i++){
+		if(i%2)
+			break;
+		printf("num %+d\n", i);
+	}
+	
+
+	// time_t now = time(NULL);
+	// char* tempo = ctime( &now );
+	// printf("%sl\n", tempo);
+	// tempo = operatToString(3, 0);
+	// printf("%s %+d | ", tempo, -2);
+	// FILE* fPtr = fopen("./servWork/piccione", "a+");
+	// printf("%d\n", fprintf(fPtr, "tre %d\n", 3));
 	// read_config("./servWork/file_config");
 	
 

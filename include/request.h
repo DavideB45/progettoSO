@@ -27,6 +27,7 @@ enum servErrorRet {
 	NO_SUCH_FILE_F,// fatale
 	UNKNOWN_ERROR_F,// fatale
 	FILE_NOT_OPEN_F,// fatale
+	SERVER_FULL,// fatale
 	FILE_ALREADY_OPEN,// non fatale
 	FILE_NOT_OPEN,// non fatale
 	NO_SUCH_FILE,// non fatale
