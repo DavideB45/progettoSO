@@ -41,13 +41,18 @@
 							 }
 
 ServerInfo srvGen;
-ClientTable* resourceTable;// da inizializzare
+ClientTable* resourceTable;
 FifoList* logQueue;
 TreeFile* fileStorage;
+volatile __sig_atomic_t serverStatus;
 
 void readConfig(char* indirizzo);
 int initServer(void);
-void createThreads(void);
+int createThreads(void);
+
+void exitFun(void);
+void sigIntQuit(int);
+void sigHup(int);
 
 void* dispatcher(void);
 // ritorna il massimo FD da ascoltare
@@ -120,24 +125,43 @@ void sendClientFatalError(int sock, int err);
 
 int main(int argc, char* argv[]){
 
+	// bloccare i segnali
 	if(initServer() != 0){
+		destroyTreeFile(fileStorage);
+		destroyClientTable(resourceTable);
+		destroyList(logQueue, destroyLogOp);
 		return 1;
 	}
 
-printf("avvio il dispatcher\n");
-	dispatcher();
-printf("sono tornato dal dispatcher\n");
-
+	if(createThreads() != 0){
 	
+	}
+	// sistemare i segnali
+	// riattivare i segnali
+	// mettere atExit
+	atexit(exitFun);
+	
+
+	dispatcher();
 
 }
 
 int initServer(void){
+
+
 	fileStorage = newTreeFile();
 	resourceTable = newClientTable();
 	logQueue = newList();
+
+	if(fileStorage == NULL || resourceTable == NULL || logQueue == NULL){
+		return -1;
+	}
+	
+
+	// leggere argv
+
 	readConfig("./servWork/file_config");
-	// creo una pipe
+
 	// [1] per scrivere [0] per leggere
 	if(pipe(srvGen.doneReq) == -1){
 		perror("pipe");
@@ -147,7 +171,10 @@ int initServer(void){
 	if(srvGen.toServe == NULL){
 		exit(EXIT_FAILURE);
 	}
-	
+	srvGen.clientNum = 0;
+	srvGen.clientMax = 0;
+	serverStatus = S_WORKING;
+
 	unlink(srvGen.sockName);
 	SOCKET(SOCKET_FD);
 
@@ -170,27 +197,55 @@ int initServer(void){
 		exit(1);
 	}
 
+	
+
 	return 0;
 }
 
-void createThreads(void){
+int createThreads(void){
 	int* id;
 	if( pthread_create( &(srvGen.threadLog), NULL, logThread,  NULL) != 0){
 			perror("pthread create");
-			exit(EXIT_FAILURE);
+			return -1;
 	}
 	for(size_t i = 0; i < srvGen.n_worker; i++){
 		if(id = malloc(sizeof(int)), id == NULL){
 			perror("malloc Int");
-			exit(EXIT_FAILURE);
+			return -1;
 		}
 		*id = i; 
 		if( pthread_create( &(srvGen.threadUse[i]->thread), NULL, worker,  id) != 0){
 			perror("pthread create");
-			exit(EXIT_FAILURE);
+			return -1;
 		}
 	}
+	return 0;
+}
+
+void exitFun(void){
+	for(int i = 0; i < srvGen.n_worker; i++){
+		pthread_join(srvGen.threadUse[i]->thread, NULL);
+		free(srvGen.threadUse[i]);
+	}
+	free(srvGen.threadUse);
+	destroyList(srvGen.toServe, free);
 	
+	destroyClientTable(resourceTable);
+	LOG_INSERT(newLogOp(0, NULL, SERVER, 0, 0, 0, 0));
+	pthread_join(srvGen.threadLog, NULL);
+	destroyTreeFile(fileStorage);
+	destroyList(logQueue, destroyLogOp);
+	free(srvGen.logName);
+	free(srvGen.sockName);
+	close(srvGen.doneReq[1]);
+	close(srvGen.doneReq[0]);
+	
+}
+void sigIntQuit(int signal){
+	serverStatus = S_FAST_CLOSE;
+}
+void sigHup(int signal){
+	serverStatus = S_SLOW_CLOSE;
 }
 
 void* dispatcher(void){
@@ -205,11 +260,9 @@ void* dispatcher(void){
 	FD_ZERO(&set);
 	FD_SET(SOCKET_FD, &set);
 	FD_SET(srvGen.doneReq[0], &set);
-	srvGen.serverStatus = S_WORKING;
 	
-	createThreads();
 
-	while(srvGen.serverStatus == S_WORKING){
+	while(serverStatus == S_WORKING){
 		rdSet = set;
 		// se qualcosa non funziona con le interruzioni provare pselect
 		
@@ -259,7 +312,7 @@ void* dispatcher(void){
 						} else {
 							/* METTO NUOVO CLIENT NELLA MASCHERA */
 							printf("NUOVA CONNESSIONE %d\n", newConn);
-							LogOp* infoLog = newLogOp(OPEN_CONNECTION, NULL, newConn, 1, 0, 0);
+							LogOp* infoLog = newLogOp(OPEN_CONNECTION, NULL, newConn, SERVER,1, 0, 0);
 							LOG_INSERT(infoLog);
 							newClient(newConn, resourceTable);///////////vedere se spostare e farlo fare al client
 							if(maxFD < newConn)
@@ -292,7 +345,7 @@ void* dispatcher(void){
 								} else {
 									// chiudo il socket
 									// non precisissimo con la dimensione
-									LogOp* infoLog = newLogOp(CLOSE_CONNECTION, NULL, GET_FD(resetConn), 1, 0, sizeof(int));
+									LogOp* infoLog = newLogOp(CLOSE_CONNECTION, NULL, GET_FD(resetConn), SERVER, 1, 0, sizeof(int));
 									LOG_INSERT(infoLog);
 									FD_CLR(GET_FD(resetConn), &set);
 									if(close(GET_FD(resetConn))){
@@ -453,19 +506,28 @@ void* logThread(void* arg){
 	fprintf(filePtr, "\nAPERTURA SERVER %s", ctime(&approxTime));
 	LogOp* toWrite = pop(logQueue);
 	while(toWrite != NULL){
-		fprintf(filePtr, "%3d : ", toWrite->client );
+		fprintf(filePtr, "%3d : %3d :", toWrite->client, toWrite->thread);
 		if(CLIENT_OP(toWrite)){
 			fprintf(filePtr, "%2d %17s | ", toWrite->opType, operatToString(toWrite->opType, FALSE));
 			fprintf(filePtr, "res = %d | ", toWrite->result);
+			if(toWrite->opType == OPEN_FILE){
+				if(WITH_CREA(toWrite)){
+					fprintf(filePtr, "created | ");
+				}
+				if(WITH_LOCK(toWrite)){
+					fprintf(filePtr, "locked | ");
+				}
+			} else {
+				if(toWrite->result == 1){
+					if(toWrite->deltaDim != 0){
+						fprintf(filePtr, "editDim = %+d | ", toWrite->deltaDim);
+					}
+				}
+			}
 			if(toWrite->fileName != NULL){
 				fprintf(filePtr, "%s | ", toWrite->fileName);
 			}
-			
-			if(toWrite->result == 1){
-				if(toWrite->deltaDim != 0){
-					fprintf(filePtr, "editDim = %+d | ", toWrite->deltaDim);
-				}
-			}
+			fprintf(filePtr, "ret dim = %d |", toWrite->dimReturn);
 		}
 		if(LRU_REPLACE(toWrite)){
 			if(FILE_REMOVED(toWrite) == 1 && toWrite->fileName != NULL){
@@ -488,7 +550,13 @@ void* logThread(void* arg){
 			}
 		}
 		if(SERV_CLOSE(toWrite)){
-			fprintf(filePtr, "%d : N file = %d DIM tot = %d | ",toWrite->client, FILE_REMANING(toWrite), SPACE_USE(toWrite));
+			fprintf(filePtr, "%d : N file = %d DIM tot = %d | ",toWrite->client, fileStorage->fileCount, fileStorage->filedim);
+			TreeNode* nodeCurr = fileStorage->mostRecentLRU;
+			while(nodeCurr != NULL){
+				if(nodeCurr->sFile != NULL){
+					fprintf(filePtr, "%s\n", nodeCurr->name);
+				}
+			}
 		}
 		
 		
@@ -589,18 +657,25 @@ void manageRequest(Request* req, int threadId){
 			} else {
 				result = openFile(req, &nodePtr);
 			}
+			int flag = 0;
+			if(GET_O_CREATE(req->oper)){
+				flag = CREA_OPEN;
+			}
+			if(GET_O_LOCK(req->oper)){
+				flag = flag | LOCK_OPEN;
+			}
 			if(result == COMPLETED_CONT){
-				infoLog = newLogOp(OPEN_FILE, duplicateString(req->sFileName), req->client, 1, 0, sizeof(int));
+				
+				
+				infoLog = newLogOp(OPEN_FILE, duplicateString(req->sFileName), req->client, threadId, 1, flag , sizeof(int));
 				LOG_INSERT(infoLog);
 			} else {
 				if(result == COMPLETED_STOP){
-					infoLog = newLogOp(OPEN_FILE, duplicateString(req->sFileName), req->client, 1, 0, sizeof(int));
-					LOG_INSERT(infoLog);
-					infoLog = newLogOp(LOCK_FILE, duplicateString(req->sFileName), req->client, 1, 0, sizeof(int));
+					infoLog = newLogOp(OPEN_FILE, duplicateString(req->sFileName), req->client, threadId, 1, flag , sizeof(int));
 					LOG_INSERT(infoLog);
 				} else {
 					if(result != DELAYED){
-						infoLog = newLogOp(OPEN_FILE, duplicateString(req->sFileName), req->client, 0, 0, sizeof(int));
+						infoLog = newLogOp(OPEN_FILE, duplicateString(req->sFileName), req->client, threadId, 0, flag, sizeof(int));
 						LOG_INSERT(infoLog);
 					}
 				}
@@ -649,7 +724,7 @@ void manageRequest(Request* req, int threadId){
 			/* devo continuare a lavorare */
 			if( Pthread_mutex_lock( &(nodePtr->lock) ) != 0){
 				perror("lockFile");
-				infoLog = newLogOp(LOCK_FILE, duplicateString(req->sFileName), WORKER, 0, 0, 0);
+				infoLog = newLogOp(LOCK_FILE, duplicateString(req->sFileName), WORKER, threadId, 0, 0, 0);
 				if(result == FAILED_CONT){
 					result = FAILED_STOP;
 				} else {
@@ -867,7 +942,7 @@ int openFile(Request* req, TreeNode** nodePtrP){
 			int res = SUCCESS;
 			*nodePtrP = nodePtr;
 			if(toRemove != NULL && expelled != NULL){
-				LOG_INSERT(newLogOp(REMOVE_FILE, duplicateString(expelled->namePath), LRU_ALG, 1, 0, 1));
+				LOG_INSERT(newLogOp(REMOVE_FILE, duplicateString(expelled->namePath), LRU_ALG, 0, 1, 0, 1));
 				clientFileDel(toRemove, resourceTable, expelled);
 				informClientDelete(expelled);
 				destroyServerFile(expelled);
@@ -892,7 +967,7 @@ int openFile(Request* req, TreeNode** nodePtrP){
 		break;
 		case EPERM:
 			if(toRemove != NULL && expelled != NULL){
-				LOG_INSERT(newLogOp(REMOVE_FILE, duplicateString(expelled->namePath), LRU_ALG, 1, 0, 1));
+				LOG_INSERT(newLogOp(REMOVE_FILE, duplicateString(expelled->namePath), LRU_ALG,0, 1, 0, 1));
 				clientFileDel(toRemove, resourceTable, expelled);
 				informClientDelete(expelled);
 				destroyServerFile(expelled);

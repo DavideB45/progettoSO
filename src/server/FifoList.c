@@ -28,6 +28,18 @@ FifoList* newList(){
 	return list;
 }
 
+void destroyList(FifoList* list, void (*freeFun)(void*)){
+	if(list == NULL){
+		return;
+	}
+	pthread_mutex_destroy( &(list->lock) );
+	pthread_cond_destroy( &(list->wait_to_read) );
+	while(!isEmpty(list)){
+		freeFun(pop(list));
+	}
+	free(list);
+}
+
 // return 1 if empty 0 if not empty
 // -1 error
 int isEmpty(FifoList* list){

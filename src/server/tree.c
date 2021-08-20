@@ -467,6 +467,7 @@ int insertToFrontLRU(TreeFile* tree, TreeNode* node){
 
 	node->lessRecentLRU = tree->mostRecentLRU;
 	tree->mostRecentLRU->moreRecentLRU = node;
+	tree->mostRecentLRU = node;
 	errno = 0;
 	return 0;
 	

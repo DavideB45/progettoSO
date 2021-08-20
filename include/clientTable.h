@@ -24,8 +24,12 @@ typedef struct clientTable{
 	ClientInfo* arr[BASEDIM];
 }ClientTable;
 
-
+// crea una ClientTable 
+// se fallisce ritorna NULL;
 ClientTable* newClientTable();
+
+// libera la memoria occupata da tab;
+void destroyClientTable(ClientTable* tab);
 
 // attiva un posto in cui saranno tenute informazioni sul client
 // se fallisce chiudo il client

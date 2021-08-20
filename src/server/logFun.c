@@ -6,7 +6,7 @@
 #include <logFun.h>
 #include <request.h>
 
-LogOp* newLogOp( enum operat opType, const char* fileName, int client, int result, int deltaDim, int dimReturn){
+LogOp* newLogOp( enum operat opType, const char* fileName, int client, int thread, int result, int deltaDim, int dimReturn){
 	LogOp* new = malloc(sizeof(LogOp));
 	if(new == NULL){
 		errno = ENOMEM;
@@ -29,13 +29,14 @@ LogOp* newLogOp( enum operat opType, const char* fileName, int client, int resul
 	new->result = result;
 	new->deltaDim = deltaDim;
 	new->dimReturn = dimReturn;
+	new->thread = thread;
 	new->execTime = time(NULL);
 	return new;
 }
 
-void destroyLogOp(LogOp* oper){
-	if(oper->fileName != NULL){
-		free(oper->fileName);
+void destroyLogOp(void* oper){
+	if(((LogOp*)oper)->fileName != NULL){
+		free(((LogOp*)oper)->fileName);
 	}
 	free(oper);
 }

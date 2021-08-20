@@ -30,7 +30,11 @@
 #define FILE_REMANING(x) x->dimReturn
 #define SPACE_USE(x) x->deltaDim
 // alla fine bisogna stampare anche l'albero
-
+#define LOCK_OPEN 1
+#define CREA_OPEN 2
+#define LOCR_OPEN 3
+#define WITH_LOCK(x) ((x->deltaDim & LOCK_OPEN) != 0)
+#define WITH_CREA(x) ((x->deltaDim & CREA_OPEN) != 0)
 
 typedef struct logOp{
 	enum operat opType;
@@ -38,13 +42,14 @@ typedef struct logOp{
 	char* fileName;
 	int client;
 	int result;
+	int thread;
 	int deltaDim;
 	int dimReturn;
 }LogOp;
 
-LogOp* newLogOp(enum operat opType, const char* fileName, int client, int result, int deltaDim, int dimReturn);
+LogOp* newLogOp(enum operat opType, const char* fileName, int client, int thread, int result, int deltaDim, int dimReturn);
 
-void destroyLogOp(LogOp* oper);
+void destroyLogOp(void* oper);
 
 
 

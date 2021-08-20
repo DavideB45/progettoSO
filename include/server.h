@@ -44,14 +44,13 @@ typedef struct ServerInfo{
 	char* sockName;// nome del socket
 	char* logName;// nome del file di log
 	int sockFD;// file descriptor del socket
-	int maxFileNum;
-	int maxFileDim;
 	int doneReq[2];// pipe per informare dispatcher
 	FifoList* toServe;// richieste dei client
-	int serverStatus;// per capire se deve chiudere
 	int n_worker;// totale thread worker
 	ThreadInfo* *threadUse;// array che dice cosa fanno i thread
 	pthread_t threadLog;// gestore del file di log
+	int clientNum;// numero di client connessi
+	int clientMax;// massimo numero di client raggiunto
 }ServerInfo;
 
 

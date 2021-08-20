@@ -48,6 +48,29 @@ ClientTable* newClientTable(){
 	return new;
 }
 
+void destroyClientTable(ClientTable * tab){
+	if(tab == NULL){
+		return;
+	}
+	ClientInfo* currPtr = NULL;
+	ClientInfo* succPtr = NULL;
+	for(size_t i = 0; i < BASEDIM; i++){
+		if(tab->arr[i] != NULL){
+			currPtr = tab->arr[i];
+			while(currPtr != NULL){
+				succPtr = currPtr->next;
+				generalListDestroy(currPtr->nodeInUse);
+				generalListDestroy(currPtr->nodeLocked);
+				pthread_mutex_destroy( &(currPtr->lock) );
+				free(currPtr);
+				currPtr = succPtr;
+			}
+		}
+	}
+	pthread_mutex_destroy( &(tab->lock) );
+	free(tab);
+}
+
 // ritorna puntatore alla struttura del client
 // poco plausibile che non ci sia
 // in caso di errore ritorna NULL

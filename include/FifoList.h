@@ -22,6 +22,11 @@ typedef struct FifoList{
 // create an empty list
 FifoList* newList();
 
+// libera la memoria occupata dalla lista
+// usa freeFun per rimuovere eventuali elementi rimasti
+// da chiamare quando nessuno puo' accedere alla lista
+void destroyList(FifoList* list, void (*freeFun)(void*));
+
 // return 1 if empty 0 if not empty
 // -1 err
 int isEmpty(FifoList* list);
