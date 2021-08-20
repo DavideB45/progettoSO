@@ -11,7 +11,7 @@ _n_worker  === 0
 
 
 
-_max_file:::= 2            
+_max_file:::= 100            
 
 
 _max_dim :=       _socket_name= daddu

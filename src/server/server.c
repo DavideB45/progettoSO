@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <string.h>
 #include <time.h>
+#include <signal.h>
 
 // selfmade
 #include <utils.h>
@@ -127,6 +128,12 @@ void sendClientFatalError(int sock, int err);
 int main(int argc, char* argv[]){
 
 	// bloccare i segnali
+	sigset_t newSet;
+	sigemptyset(&newSet);
+	sigaddset(&newSet, SIGINT);
+	sigset_t oldSet;
+	pthread_sigmask(SIG_SETMASK, &newSet, &oldSet);
+	
 	if(initServer() != 0){
 		destroyTreeFile(fileStorage);
 		destroyClientTable(resourceTable);
@@ -137,6 +144,16 @@ int main(int argc, char* argv[]){
 	if(createThreads() != 0){
 		exit(1);
 	}
+
+	struct sigaction nuova_gestione_c;
+	memset( &nuova_gestione_c, 0, sizeof(nuova_gestione_c) );
+	nuova_gestione_c.sa_handler = sigIntQuit;
+	if(sigaction(SIGINT, &nuova_gestione_c, NULL)){
+		perror("sigaction 1");
+		exit(1);
+	}
+	
+	pthread_sigmask(SIG_SETMASK, &oldSet, NULL);
 	// sistemare i segnali
 	// riattivare i segnali
 	// mettere atExit
@@ -244,20 +261,26 @@ void collectThreads(void){
 
 void exitFun(void){
 	
-	free(srvGen.threadUse);
-	destroyList(srvGen.toServe, free);
+	
+	
 	destroyClientTable(resourceTable);
 	destroyTreeFile(fileStorage);
 	destroyList(logQueue, destroyLogOp);
+
+	destroyList(srvGen.toServe, free);
+	free(srvGen.threadUse);
 	free(srvGen.logName);
 	free(srvGen.sockName);
+	close(srvGen.sockFD);
 	close(srvGen.doneReq[1]);
 	close(srvGen.doneReq[0]);
 	
 }
+
 void sigIntQuit(int signal){
 	serverStatus = S_FAST_CLOSE;
 }
+
 void sigHup(int signal){
 	serverStatus = S_SLOW_CLOSE;
 }
@@ -334,6 +357,11 @@ void dispatcher(void){
 							printf("NUOVA CONNESSIONE %d\n", newConn);
 							LogOp* infoLog = newLogOp(OPEN_CONNECTION, NULL, newConn, SERVER,1, 0, 0);
 							LOG_INSERT(infoLog);
+							(srvGen.clientNum)++;
+							if(srvGen.clientNum > srvGen.clientMax){
+								srvGen.clientMax = srvGen.clientNum;
+							}
+							
 							newClient(newConn, resourceTable);///////////vedere se spostare e farlo fare al client
 							if(maxFD < newConn)
 								maxFD = newConn;
@@ -364,7 +392,7 @@ void dispatcher(void){
 									FD_SET(GET_FD(resetConn), &set);
 								} else {
 									// chiudo il socket
-									// non precisissimo con la dimensione
+									(srvGen.clientNum)--;
 									LogOp* infoLog = newLogOp(CLOSE_CONNECTION, NULL, GET_FD(resetConn), SERVER, 1, 0, sizeof(int));
 									LOG_INSERT(infoLog);
 									FD_CLR(GET_FD(resetConn), &set);
@@ -506,6 +534,7 @@ void readConfig(char* indirizzo){
 	printf("nameSo : %s\n", srvGen.sockName);
 
 	printf("nameLo : %s\n", srvGen.logName);
+	fclose(filePtr);
 }
 
 int updatemax(fd_set set, int maxFD){
@@ -527,7 +556,7 @@ void* logThread(void* arg){
 	fprintf(filePtr, "\nAPERTURA SERVER %s", ctime(&approxTime));
 	LogOp* toWrite = pop(logQueue);
 	while(toWrite != NULL){
-		fprintf(filePtr, "%3d : %3d :", toWrite->client, toWrite->thread);
+		fprintf(filePtr, "%3d : %3d : ", toWrite->client, toWrite->thread);
 		if(CLIENT_OP(toWrite)){
 			fprintf(filePtr, "%2d %17s | ", toWrite->opType, operatToString(toWrite->opType, FALSE));
 			fprintf(filePtr, "res = %d | ", toWrite->result);
@@ -572,12 +601,6 @@ void* logThread(void* arg){
 		}
 		if(SERV_CLOSE(toWrite)){
 			fprintf(filePtr, "%d : N file = %d DIM tot = %d | ",toWrite->client, fileStorage->fileCount, fileStorage->filedim);
-			TreeNode* nodeCurr = fileStorage->mostRecentLRU;
-			while(nodeCurr != NULL){
-				if(nodeCurr->sFile != NULL){
-					fprintf(filePtr, "%s\n", nodeCurr->name);
-				}
-			}
 		}
 		
 		
@@ -589,6 +612,13 @@ void* logThread(void* arg){
 		} else {
 			destroyLogOp(toWrite);
 			toWrite = NULL;
+		}
+	}
+	TreeNode* nodeCurr = fileStorage->mostRecentLRU;
+	while(nodeCurr != NULL){
+		if(nodeCurr->sFile != NULL){
+			fprintf(filePtr, "%s\n", nodeCurr->name);
+			nodeCurr = nodeCurr->lessRecentLRU;
 		}
 	}
 	printf("non scrivo nel file piccione\n");
@@ -611,6 +641,7 @@ printf("ciao, sono nato %d\n", threadId);
 	} else {
 		int clId = *readSocK;
 		int oper = 0;
+		free(readSocK);
 		switch( readn(clId, &oper, sizeof(int)) ){
 		case -1:
 			/* errore in lettura non risolvibile */		
@@ -621,14 +652,14 @@ printf("ciao, sono nato %d\n", threadId);
 			DISCONN_CLIENT(clId);
 		break;
 		default:;
-			printf("%d : richiesta da %d\n",threadId, *readSocK);
+			printf("%d : richiesta da %d\n",threadId, clId);
 			Request* req = newRequest(oper, clId, NULL, 0, NULL);
 			manageRequest(req, threadId);
 		break;
 		}
-	} 
-	
 	}
+	}
+	return NULL;
 }
 
 void manageRequest(Request* req, int threadId){
@@ -746,6 +777,7 @@ void manageRequest(Request* req, int threadId){
 			if( Pthread_mutex_lock( &(nodePtr->lock) ) != 0){
 				perror("lockFile");
 				infoLog = newLogOp(LOCK_FILE, duplicateString(req->sFileName), WORKER, threadId, 0, 0, 0);
+				LOG_INSERT(infoLog);
 				if(result == FAILED_CONT){
 					result = FAILED_STOP;
 				} else {
@@ -770,7 +802,13 @@ void manageRequest(Request* req, int threadId){
 
 	}while( req != NULL && (result == FAILED_CONT || result == COMPLETED_CONT) );
 	
-	// move to front LRU
+	if(nodePtr != NULL && result != FILE_DELETED && result != DELAYED){
+		if(startMutexTreeFile(fileStorage) == 0){
+			moveToFrontLRU(fileStorage, nodePtr);
+			endMutexTreeFile(fileStorage);
+		}
+	}
+	
 	if(result == FILE_DELETED){
 		/* mi occupo di informare gli altri client*/
 		removeFile(req, nodePtr);
@@ -778,7 +816,7 @@ void manageRequest(Request* req, int threadId){
 	
 	
 
-	// destroy req
+	destroyRequest(&req);
 	return;
 }
 

@@ -47,7 +47,7 @@ typedef struct logOp{
 	int dimReturn;
 }LogOp;
 
-LogOp* newLogOp(enum operat opType, const char* fileName, int client, int thread, int result, int deltaDim, int dimReturn);
+LogOp* newLogOp(enum operat opType, char* fileName, int client, int thread, int result, int deltaDim, int dimReturn);
 
 void destroyLogOp(void* oper);
 

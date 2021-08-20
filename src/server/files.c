@@ -99,6 +99,7 @@ void destroyServerFile(ServerFile* obj){
 	
 	generalListDestroy(obj->openList);
 	generalListDestroy(obj->requestList);
+	free(obj->namePath);
 	free(obj->data);
 	free(obj);
 	obj = NULL;
