@@ -52,6 +52,7 @@ int initServer(void);
 int createThreads(void);
 void collectThreads(void);
 
+int setNewHand(void);
 void exitFun(void);
 void sigIntQuit(int);
 void sigHup(int);
@@ -132,32 +133,31 @@ int main(int argc, char* argv[]){
 	sigemptyset(&newSet);
 	sigaddset(&newSet, SIGINT);
 	sigset_t oldSet;
+
 	pthread_sigmask(SIG_SETMASK, &newSet, &oldSet);
 	
+
+	// controlla di non aver lasciato nulla
 	if(initServer() != 0){
 		destroyTreeFile(fileStorage);
 		destroyClientTable(resourceTable);
 		destroyList(logQueue, destroyLogOp);
-		return 1;
+		exit(EXIT_FAILURE);
 	}
 
 	if(createThreads() != 0){
 		exit(1);
 	}
 
-	struct sigaction nuova_gestione_c;
-	memset( &nuova_gestione_c, 0, sizeof(nuova_gestione_c) );
-	nuova_gestione_c.sa_handler = sigIntQuit;
-	if(sigaction(SIGINT, &nuova_gestione_c, NULL)){
-		perror("sigaction 1");
-		exit(1);
+	if(setNewHand() != 0){
+		exit(EXIT_FAILURE);
 	}
-	
+
+	if(atexit(exitFun)){
+		return -1;
+	}
+
 	pthread_sigmask(SIG_SETMASK, &oldSet, NULL);
-	// sistemare i segnali
-	// riattivare i segnali
-	// mettere atExit
-	atexit(exitFun);
 	
 	dispatcher();
 
@@ -257,6 +257,36 @@ void collectThreads(void){
 	} else {
 		pthread_join(srvGen.threadLog, NULL);
 	}
+}
+
+int setNewHand(void){
+	struct sigaction newSigint;
+	memset( &newSigint, 0, sizeof(newSigint) );
+	newSigint.sa_handler = sigIntQuit;
+	sigaddset( &(newSigint.sa_mask), SIGQUIT );
+	if(sigaction(SIGINT, &newSigint, NULL)){
+		perror("sigaction 1");
+		return -1;
+	}
+
+	struct sigaction newSigquit;
+	memset( &newSigquit, 0, sizeof(newSigquit) );
+	newSigquit.sa_handler = sigIntQuit;
+	sigaddset( &(newSigquit.sa_mask), SIGINT );
+	if(sigaction(SIGQUIT, &newSigquit, NULL)){
+		perror("sigaction 1");
+		return -1;
+	}
+
+	struct sigaction newSigHup;
+	memset( &newSigHup, 0, sizeof(newSigHup) );
+	newSigHup.sa_handler = sigIntQuit;
+	if(sigaction(SIGHUP, &newSigHup, NULL)){
+		perror("sigaction 1");
+		return -1;
+	}
+
+	return 0;
 }
 
 void exitFun(void){
@@ -804,7 +834,9 @@ void manageRequest(Request* req, int threadId){
 	
 	if(nodePtr != NULL && result != FILE_DELETED && result != DELAYED){
 		if(startMutexTreeFile(fileStorage) == 0){
-			moveToFrontLRU(fileStorage, nodePtr);
+			if(nodePtr->sFile != NULL){
+				moveToFrontLRU(fileStorage, nodePtr);	
+			}
 			endMutexTreeFile(fileStorage);
 		}
 	}
