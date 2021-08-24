@@ -44,6 +44,18 @@ int openFile(const char* pathname, int flags);
  */
 int closeFile(const char* pathname);
 
+/** scrive nel file(server) PATHNAME
+ * il contenuto del file(locale) PATHNAME
+ * ha successo se la chiamata precedente era
+ * openFile(pathname, O_CREATE | O_LOCK)
+ * se DIRNAME non e' nullo viene usato per
+ * salvare eventuali file espulsi
+ * \retval 0 successo
+ * \retval -1 fallimento
+ * \retval errno settato
+ */
+int writeFile(const char* pathname, const char* dirname);
+
 /** appende i primi SIZE byte di BUFF al file PATHNAME
  * se DIRNAME non e' nullo viene usato per 
  * salvare eventuali file espulsi
@@ -52,7 +64,6 @@ int closeFile(const char* pathname);
  * \retval errno settato
  */
 int appendToFile(const char* pathname, void* buff, size_t size, const char* dirname);
-
 
 /** attiva la mutua esclusione sul file PATHNAME
  * \retval 0 successo

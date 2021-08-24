@@ -85,9 +85,9 @@ int readFileW(Request* req, ServerFile* filePtr);
 // scrive al client il contenuto di N files
 int readNFilesW(Request* req);
 // scrive nel file richiesto dal client
-int writeFileW(Request* req, ServerFile* filePtr);
+int writeFileW(Request* req, TreeNode* nodePtr, int threadId);
 // appende al file richiesto dal client
-int appendToFileW(Request* req, TreeNode* nodePtr,int threadId);
+int appendToFileW(Request* req, TreeNode* nodePtr,int threadId, int logOpKind);
 // attiva la mutua esclusione su un file
 int lockFileW(Request* req, TreeNode* nodePtr, int threadId);
 // termina la mutua esclusione su un file
@@ -704,7 +704,6 @@ void manageRequest(Request* req, int threadId){
 	Request* newReq = NULL;
 	LogOp* infoLog = NULL;
 	enum operResult result = NONE;
-	// int buffInt = 0;
 	do{
 		switch(GET_OP(req->oper)){
 		case CLOSE_CONNECTION:
@@ -778,7 +777,30 @@ void manageRequest(Request* req, int threadId){
 		break;
 		case WRITE_FILE:
 			printf("WRITE_FILE\n");
-			writeFileW(req, (ServerFile*)nodePtr);
+			if(req->sFileName == NULL){
+				nodePtr = getFileFromSocket(req, &result, threadId);
+				if(result == NONE){
+					if(nodePtr == NULL){
+						sendClientFatalError(req->client, NO_SUCH_FILE_F << 24);
+						result = FAILED_STOP;
+					} else {
+						/* file trovato (eseguo la richiesta) */
+						switch(tryUse(nodePtr, req, FALSE)){
+						case -1:
+							result = FAILED_STOP;
+						break;
+						case 0:
+							result = DELAYED;
+						break;
+						case 1:
+							result = writeFileW(req, nodePtr, threadId);
+						break;
+						}
+					}
+				}
+			} else {
+				result = writeFileW(req, nodePtr, threadId);
+			}
 		break;
 		case APPEND_TO_FILE:
 			printf("APPEND_TO_FILE\n");
@@ -798,13 +820,13 @@ void manageRequest(Request* req, int threadId){
 							result = DELAYED;
 						break;
 						case 1:
-							result = appendToFileW(req, nodePtr, threadId);
+							result = appendToFileW(req, nodePtr, threadId, APPEND_TO_FILE);
 						break;
 						}
 					}
 				}
 			} else {
-				result = appendToFileW(req, nodePtr, threadId);
+				result = appendToFileW(req, nodePtr, threadId, APPEND_TO_FILE);
 			}
 		break;
 		case LOCK_FILE:
@@ -1173,6 +1195,7 @@ int openFileW(Request* req, TreeNode** nodePtrP){
 		}
 	}
 	// il file va solo aperto
+	nodePtr->sFile->creator = -1;
 	int* client_ = malloc(sizeof(int));
 	if(client_ == NULL){
 		sendClientFatalError(req->client, NO_MEMORY_F);
@@ -1233,47 +1256,90 @@ int readFileW(Request* req, ServerFile* filePtr){
 int readNFilesW(Request* req){
 	return FAILED_STOP;
 }
-int writeFileW(Request* req, ServerFile* filePtr){
-	// non e' che un append + fancy
-	return FAILED_STOP;
+
+
+int writeFileW(Request* req, TreeNode* nodePtr, int threadId){
+
+	// o ho lock o nessuno la ha
+	if(nodePtr->sFile->flagO_lock == 1 && nodePtr->sFile->creator == req->client){
+		return appendToFileW(req, nodePtr, threadId, WRITE_FILE);
+	}
+	nodePtr->sFile->creator = -1;
+	LogOp* infoLog;
+	int buffInt;
+	char* buff;
+	int retWork;
+	int alreadyInform = 0;
+	infoLog = newLogOp(WRITE_FILE, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
+	LOG_INSERT(infoLog);
+	
+	if(readn(req->client, &buffInt, sizeof(int)) != 1){
+		alreadyInform = 1;
+		sendClientFatalError(req->client, IMPOSSIBLE_READ << 24);
+	} else {
+		buff = malloc(buffInt);
+		if(buff == NULL){
+			alreadyInform = 1;
+			sendClientFatalError(req->client, NO_MEMORY_F << 24);
+		} else {
+			if(readn(req->client, buff, buffInt) != 1){
+				alreadyInform = 1;
+				sendClientFatalError(req->client, IMPOSSIBLE_READ << 24);
+			}
+			free(buff);
+		}
+		
+	}
+
+	if(nodePtr->sFile->flagO_lock == 1){
+		if(Pthread_mutex_lock( &(nodePtr->lock) ) == 0){
+			nodePtr->sFile->flagUse = 0;
+			Pthread_mutex_unlock( &(nodePtr->lock) );
+		}
+		retWork = FAILED_STOP;
+	} else {
+		retWork = FAILED_CONT;
+	}
+	if(!alreadyInform){
+		sendClientError(req->client, FILE_ALREADY_OPEN);
+	}
+	return retWork;
 }
 
 // ritorna un intero diviso in 2
-int appendToFileW(Request* req, TreeNode* nodePtr, int threadId){
-	//////////////////////devi chiudere il file qunado non esiste
+int appendToFileW(Request* req, TreeNode* nodePtr, int threadId, int logOpKind){
 	int size = 0;
 	LogOp* logInfo;
-	// togliere per la write
 	nodePtr->sFile->creator = -1;
 	if(readFormSocket(req->client, &size, sizeof(int)) == -1){
 		sendClientFatalError(req->client, IMPOSSIBLE_READ << 24);
-		logInfo = newLogOp(APPEND_TO_FILE, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
+		logInfo = newLogOp(logOpKind, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
 		LOG_INSERT(logInfo);
 		return FAILED_CONT;
 	}
 	req->forEdit = malloc(size*sizeof(char));
 	if(req->forEdit == NULL){
 		sendClientFatalError(req->client, NO_MEMORY_F << 24);
-		logInfo = newLogOp(APPEND_TO_FILE, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
+		logInfo = newLogOp(logOpKind, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
 		LOG_INSERT(logInfo);
 		return FAILED_CONT;
 	}
 	if(readFormSocket(req->client, req->forEdit, size ) == -1){
 		sendClientFatalError(req->client, IMPOSSIBLE_READ << 24);
-		logInfo = newLogOp(APPEND_TO_FILE, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
+		logInfo = newLogOp(logOpKind, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
 		LOG_INSERT(logInfo);
 		return FAILED_CONT;
 	}
 	printf("ho letto %d lettere : %s\n", size, req->forEdit);
 	if(!isInGeneralList(&(req->client), nodePtr->sFile->openList)){
 		sendClientError(req->client, FILE_NOT_OPEN << 24);
-		logInfo = newLogOp(APPEND_TO_FILE, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
+		logInfo = newLogOp(logOpKind, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
 		LOG_INSERT(logInfo);
 		return FAILED_CONT;
 	}
 	
 	if(startMutexTreeFile(fileStorage) != 0){
-		logInfo = newLogOp(APPEND_TO_FILE, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
+		logInfo = newLogOp(logOpKind, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
 		LOG_INSERT(logInfo);
 		if(nodePtr->sFile->flagO_lock == 1){
 			if(Pthread_mutex_lock( &(nodePtr->lock) ) == 0){
@@ -1292,7 +1358,7 @@ int appendToFileW(Request* req, TreeNode* nodePtr, int threadId){
 	char* toretVict = malloc(sizeof(int));
 	if(toretVict == NULL){
 		endMutexTreeFile(fileStorage);
-		logInfo = newLogOp(APPEND_TO_FILE, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
+		logInfo = newLogOp(logOpKind, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
 		LOG_INSERT(logInfo);
 		if(nodePtr->sFile->flagO_lock == 1){
 			if(Pthread_mutex_lock( &(nodePtr->lock) ) == 0){
@@ -1317,7 +1383,7 @@ int appendToFileW(Request* req, TreeNode* nodePtr, int threadId){
 			// int forCli = (NO_MEMORY << 24);
 			// printf("invio %d\n", forCli);
 			sendClientError(req->client, (NO_MEMORY << 24));
-			logInfo = newLogOp(APPEND_TO_FILE, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
+			logInfo = newLogOp(logOpKind, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
 			LOG_INSERT(logInfo);
 			free(toretVict);
 			return FAILED_CONT;
@@ -1345,7 +1411,7 @@ int appendToFileW(Request* req, TreeNode* nodePtr, int threadId){
 					generalListDestroy(toRem);
 					endMutexTreeFile(fileStorage);
 					// informa log di cosa ha fatto algoritmo LRU
-					logInfo = newLogOp(APPEND_TO_FILE, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
+					logInfo = newLogOp(logOpKind, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
 					LOG_INSERT(logInfo);
 					logInfo = newLogOp(0, 0, LRU_ALG, threadId, 0, dimVic, numVic);
 					LOG_INSERT(logInfo);
@@ -1386,7 +1452,7 @@ int appendToFileW(Request* req, TreeNode* nodePtr, int threadId){
 				generalListDestroy(toRem);
 				endMutexTreeFile(fileStorage);
 				// informare log di cosa ha fatto LRU
-				logInfo = newLogOp(APPEND_TO_FILE, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
+				logInfo = newLogOp(logOpKind, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
 				LOG_INSERT(logInfo);
 				logInfo = newLogOp(0, NULL, LRU_ALG, threadId, 0, dimVic, numVic);
 				LOG_INSERT(logInfo);
@@ -1448,11 +1514,11 @@ int appendToFileW(Request* req, TreeNode* nodePtr, int threadId){
 					Pthread_mutex_unlock( &(nodePtr->lock) );
 				}
 				if(GET_DIR_SAVE(req->oper)){
-					logInfo = newLogOp(APPEND_TO_FILE, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
+					logInfo = newLogOp(logOpKind, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
 					LOG_INSERT(logInfo);
 					sendClientResult(req->client, toretVict, sizeof(int));
 				} else {
-					logInfo = newLogOp(APPEND_TO_FILE, req->sFileName, req->client, threadId, 0, 0, dimVic);
+					logInfo = newLogOp(logOpKind, req->sFileName, req->client, threadId, 0, 0, dimVic);
 					LOG_INSERT(logInfo);
 					sendClientResult(req->client, toretVict, dimVic);
 				}
@@ -1460,11 +1526,11 @@ int appendToFileW(Request* req, TreeNode* nodePtr, int threadId){
 				return FAILED_STOP;
 			}
 			if(GET_DIR_SAVE(req->oper)){
-				logInfo = newLogOp(APPEND_TO_FILE, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
+				logInfo = newLogOp(logOpKind, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
 				LOG_INSERT(logInfo);
 				sendClientResult(req->client, toretVict, sizeof(int));
 			} else {
-				logInfo = newLogOp(APPEND_TO_FILE, req->sFileName, req->client, threadId, 0, 0, dimVic);
+				logInfo = newLogOp(logOpKind, req->sFileName, req->client, threadId, 0, 0, dimVic);
 				LOG_INSERT(logInfo);
 				sendClientResult(req->client, toretVict, dimVic);
 			}
@@ -1495,7 +1561,7 @@ int appendToFileW(Request* req, TreeNode* nodePtr, int threadId){
 		printf("%d %c\n", toretVict[i], toretVict[i]);
 	}
 	free(toretVict);
-	logInfo = newLogOp(APPEND_TO_FILE, req->sFileName, req->client, threadId, 1, size, dimVic);
+	logInfo = newLogOp(logOpKind, req->sFileName, req->client, threadId, 1, size, dimVic);
 	LOG_INSERT(logInfo);
 
 	if(nodePtr->sFile->flagO_lock == 1){
@@ -1547,7 +1613,7 @@ int unlockFileW(Request* req, TreeNode* nodePtr, int threadId){
 		LOG_INSERT(infoLog);
 		return FAILED_CONT;
 	}
-	
+	nodePtr->sFile->creator = -1;
 
 	if(Pthread_mutex_lock( &(nodePtr->lock) ) != 0){
 		sendClientError(req->client, UNKNOWN_ERROR);
@@ -1577,7 +1643,7 @@ int closeFileW(Request* req, TreeNode* nodePtr, int threadId){
 		sendClientError(req->client, FILE_NOT_OPEN);
 		return FAILED_CONT;
 	}
-	
+	nodePtr->sFile->creator = -1;
 	generalListRemove( &(req->client), nodePtr->sFile->openList);
 	if(nodePtr->sFile->flagO_lock == 1){
 		if(Pthread_mutex_lock( &(nodePtr->lock) ) == 0){

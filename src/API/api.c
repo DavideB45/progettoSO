@@ -419,6 +419,110 @@ int closeFile(const char* pathname){
 	return 0;
 }
 
+int writeFile(const char* pathname, const char* dirname){
+	if(pathname == NULL){
+		errno = EINVAL;
+		return -1;
+	}
+	int fileFd = open(pathname, 0);
+	if(fileFd == -1){
+		return -1;
+	}
+	
+	struct stat infoFile;
+	if(fstat(fileFd, &infoFile) != 0){
+		return -1;
+	}
+	char* fileDup = malloc(infoFile.st_size);
+	if(fileDup == NULL){
+		errno = ENOMEM;
+		return -1;
+	}
+	int err;
+	switch(readn(fileFd, fileDup, infoFile.st_size)){
+		case -1:
+			err = errno;
+			close(fileFd);
+			free(fileDup);
+			errno = err;
+		return -1;
+		case 0:
+			printf("hai letto EOF\n");
+			err = errno;
+			close(fileFd);
+			free(fileDup);
+			errno = err;
+		return -1;
+		case 1:
+			close(fileFd);
+		break;
+	}
+	char* req;
+	int op, reqDim;
+	int nameLen = strlen(pathname);
+	SET_CLEAN(op);
+	SET_OP(op, WRITE_FILE);
+	SET_PATH_DIM(op, nameLen);
+	if(dirname != NULL){
+		SET_DIR_SAVE(op);
+	}
+	reqDim = 2*sizeof(int) + nameLen + 1 + infoFile.st_size;
+	req = malloc(reqDim);
+	if(req == NULL){
+		free(fileDup);
+		errno = ENOMEM;
+		return -1;
+	}
+	memcpy(req, &op, sizeof(int));
+	memcpy(req, pathname, nameLen + 1);
+	memcpy(req + sizeof(int) + nameLen + 1, &(infoFile.st_size), sizeof(int));
+	memcpy(req + 2*sizeof(int) + nameLen + 1, fileDup, infoFile.st_size);
+	free(fileDup);
+
+	switch(writen(_sock, req, reqDim)){
+		case -1:
+			err = errno;
+			free(req);
+			errno = err;
+			return -1;
+		case 0:
+			free(req);
+			errno = ESRCH;
+			return -1;
+		case 1:
+			free(req);
+		break;
+	}
+	int result;
+	switch(readn(_sock, &result, sizeof(int))){
+		case -1:
+			// errno settato
+			return -1;
+		break;
+		case 0:
+			errno = ESRCH;
+			return -1;
+		break;
+		default:
+			if(dirname != NULL){
+				int nFile = result & 0x00ffffff;
+				saveExFile(_sock, dirname, nFile);
+				if(errno != 0){
+					return -1;
+				}
+			}
+			if((result >> 24) == SUCCESS){
+				errno = 0;
+				return 0;
+			} else {
+				setErrno(result >> 24);
+				return -1;
+			}
+		break;
+	}
+
+}
+
 int appendToFile(const char* pathname, void* buff, size_t size, const char* dirname){
 	if(pathname == NULL || (size != 0 && buff == NULL) || size < 0){
 		errno = EINVAL;
@@ -482,6 +586,7 @@ int appendToFile(const char* pathname, void* buff, size_t size, const char* dirn
 				}
 			}
 			if((result >> 24) == SUCCESS){
+				errno = 0;
 				return 0;
 			} else {
 				setErrno(result >> 24);
