@@ -38,5 +38,5 @@ clienttest.out : $(CLIENT2OBJ)
 	$(CC) $(CFLAGS) $< -c 
 
 clean : 
-	-rm *.o *.out
+	-rm ./obj/*.o *.out
 	-rm ./bin/* 
