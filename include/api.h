@@ -5,15 +5,28 @@
 
 #include <stdlib.h>
 
-#define SOCKNAME "../mysock"
 #define UNIX_PATH_MAX 108
 
 #define O_CREATE 2
 #define O_LOCK 1
 
-int sock;
-//	connect to the server
+
+/** apre una connessione con il server usando SOCKNAME
+ * la richiesta viene ripetuta ogni MSEC millisecondi
+ * fino al raggiungimento di ABSTIME
+ * \retval 0 successo
+ * \retval -1 se fallisce
+ * \retval errno settato
+ */
 int openConnection(const char* sockname, int msec, const struct timespec abstime);
+
+/** chiude la connessione con il server
+ * SOCKNAME e' il nome del socket usato per comunicare
+ * \retval 0 success
+ * \retval -1 se fallisce
+ * \retval errno settato
+ */
+int closeConnection(const char* sockname);
 
 /** apre il file PATHNAME 
  * se chimata con flag O_CREATE lo crea, 
@@ -48,6 +61,6 @@ int lockFile(const char* pathname);
  */
 int unlockFile(const char* pathname);
 
-int closeConnection();
+
 
 #endif

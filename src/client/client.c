@@ -5,13 +5,22 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <time.h>
 
 int main(void){
 	struct timespec tempo;
-	tempo.tv_nsec = 0;
-	tempo.tv_sec = 10;
-	openConnection("./servWork/daddu", 10, tempo);
-	
+	clock_gettime(CLOCK_REALTIME, &tempo);
+	tempo.tv_sec += 10;
+	close(-1);
+	perror("close -1");
+	openFile("giacomo", 0);
+	perror("giacomo");
+	openConnection("./servWork/daddu", 2000, tempo);
+	perror("openConnection");
+	closeConnection("./servWork/daddu");
+	perror("closeConnection");
+
+
 	int flag = 0;
 	int choise;
 	char* fileNome;
@@ -41,9 +50,7 @@ int main(void){
 		} else {
 			printf("scrivi una parola : ");
 			scanf("%s", edit);
-			if(appendToFile(fileNome, "edit dodiciiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii\
-			iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii\
-			iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii", 218, "./fileNonVoluti") != 0){
+			if(appendToFile(fileNome, "edit dodici", 12, "./fileNonVoluti") != 0){
 				perror("misfatto");
 			}
 		}

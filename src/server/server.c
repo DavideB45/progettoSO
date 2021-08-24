@@ -918,7 +918,7 @@ void manageRequest(Request* req, int threadId){
 	}
 	
 	
-	printf("%ld sono in vacanza\n", threadId);
+	printf("%d sono in vacanza\n", threadId);
 	destroyRequest(&req);
 	return;
 }
@@ -1505,7 +1505,8 @@ int lockFileW(Request* req, TreeNode* nodePtr, int threadId){
 	Pthread_mutex_unlock( &(nodePtr->lock) );
 
 	clientLock(req->client, nodePtr, resourceTable);
-	sendClientResult(req->client, SUCCESS, sizeof(int));
+	int res = SUCCESS;
+	sendClientResult(req->client, &res, sizeof(int));
 	infoLog = newLogOp(LOCK_FILE, req->sFileName, req->client, threadId, 1, 0, sizeof(int));
 	LOG_INSERT(infoLog);
 	
@@ -1532,7 +1533,8 @@ int unlockFileW(Request* req, TreeNode* nodePtr, int threadId){
 	Pthread_mutex_unlock( &(nodePtr->lock) );
 	
 	clientUnlock(req->client, nodePtr, resourceTable);
-	sendClientResult(req->client, SUCCESS, sizeof(int));
+	int res = SUCCESS;
+	sendClientResult(req->client, &res, sizeof(int));
 	infoLog = newLogOp(UNLOCK_FILE, req->sFileName, req->client, threadId, 1, 0, sizeof(int));
 	LOG_INSERT(infoLog);
 	

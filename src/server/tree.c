@@ -529,7 +529,7 @@ GeneralList* makeSpace(TreeFile* tree, int nFile, int dimSpace){
 		return NULL;
 	}
 	while( currVictim != NULL && (nVictim < nFile || spaceVictim < dimSpace) ){
-		printf("esamino %p, dim %d \n", currVictim, currVictim->sFile->dim);
+		printf("esamino %p, dim %d \n", (void*) currVictim, currVictim->sFile->dim);
 		if( Pthread_mutex_lock( &(currVictim->lock) ) == 0){
 			if(currVictim->sFile != NULL && currVictim->sFile->flagUse == 0){
 				currVictim->sFile->flagUse = 1;
