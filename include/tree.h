@@ -25,6 +25,9 @@ typedef struct TreeFile{
 	struct TreeNode* mostRecentLRU;
 	struct TreeNode* leastRecentLRU;
 
+	int maxUsedSpace;
+	int maxUsedFile;
+
 	int maxFileNum;
 	int maxFileDim;
 

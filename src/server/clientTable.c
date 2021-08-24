@@ -29,7 +29,7 @@ ClientInfo* clientGetNoLock(int clientId, ClientTable *tab){
 			toRet = toRet->next;
 		}
 	}
-	return toRet;
+	return NULL;
 }
 
 ClientTable* newClientTable(){
@@ -328,21 +328,29 @@ int clientFileDel(TreeNode* nodePtr, ClientTable* tab, ServerFile* filePtr){
 	// non chiamo lock su file (chiamata da chi vuolerimuovere il file)
 	int* clientId = NULL;
 	ClientInfo* clientPtr;
+	printf("problema 1\n");
+	fflush(stdout);
 	while(clientId = generalListPop( filePtr->openList ), clientId != NULL){
 		// non posso chiamare clientClose perche' perderei mutua esclusione
 		clientPtr = clientGetNoLock(*clientId, tab);
 		if(clientPtr != NULL){
 			// se avanza tempo chiudere il client e non terminare completamente
+			printf("problema 2\n");
+			fflush(stdout);
 			if( Pthread_mutex_lock( &(clientPtr->lock) ) != 0){
 				Pthread_mutex_unlock( &(tab->lock) );
 				errno = EPERM;
 				return -1;
 			}
+			printf("problema 3\n");
+			fflush(stdout);
 			generalListRemove( (void*) nodePtr, clientPtr->nodeInUse );
 			Pthread_mutex_unlock( &(clientPtr->lock) );
 		}
 		free(clientId);
 	}
+	printf("problema 4\n");
+	fflush(stdout);
 	if( filePtr->flagO_lock == 1){
 		clientPtr = clientGetNoLock(  filePtr->lockOwner , tab);
 		if( Pthread_mutex_lock( &(clientPtr->lock) ) != 0){

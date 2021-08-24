@@ -23,11 +23,12 @@ enum servErrorRet {
 	IMPOSSIBLE_READ,// fatale
 	NO_OP_SUPPORT,// fatale
 	INVALID_DIM,// fatale
-	NO_MEMORY,// fatale
+	NO_MEMORY_F,// fatale
 	NO_SUCH_FILE_F,// fatale
 	UNKNOWN_ERROR_F,// fatale
 	FILE_NOT_OPEN_F,// fatale
 	SERVER_FULL,// fatale
+	NO_MEMORY,// non fatale
 	FILE_ALREADY_OPEN,// non fatale
 	FILE_NOT_OPEN,// non fatale
 	NO_SUCH_FILE,// non fatale

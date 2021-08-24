@@ -16,9 +16,11 @@ int main(void){
 	flag = O_CREATE | O_LOCK;
 
 	openFile("file/di/test2", flag);
+	appendToFile("file/di/test2", "NANI", 5, NULL);
 	openFile("peppino", flag);
 	openFile("pippo", flag);
 	openFile("pluto/gino", flag);
+	appendToFile("peppino", "npersone", 9, NULL);
 	openFile("minni", flag);
 
 	printf("scrivi per terminare [   ]\b\b\b");

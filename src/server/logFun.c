@@ -12,19 +12,18 @@ LogOp* newLogOp( enum operat opType, char* fileName, int client, int thread, int
 		errno = ENOMEM;
 		return NULL;
 	}
-	// if(fileName != NULL){
-	// 	int nLen = strlen(fileName) + 1;
-	// 	new->fileName = malloc(nLen*sizeof(char));
-	// 	if(new->fileName == NULL){
-	// 		free(new);
-	// 		errno = ENOMEM;
-	// 		return NULL;
-	// 	}
-	// 	new->fileName = strcpy(new->fileName, fileName);
-	// } else {
-	// 	new->fileName = NULL;
-	// }
-	new->fileName = fileName;
+	if(fileName != NULL){
+		int nLen = strlen(fileName) + 1;
+		new->fileName = malloc(nLen*sizeof(char));
+		if(new->fileName == NULL){
+			free(new);
+			errno = ENOMEM;
+			return NULL;
+		}
+		new->fileName = strcpy(new->fileName, fileName);
+	} else {
+		new->fileName = NULL;
+	}
 	new->opType = opType;
 	new->client = client;
 	new->result = result;

@@ -37,7 +37,12 @@ ServerFile* newServerFile(int creator, int O_lock, char* nameP){
 		return NULL;
 	}
 	
-	newFile->creator = creator;
+	if(O_lock){
+		newFile->creator = creator;
+	} else {
+		newFile->creator = -1;
+	}
+	
 	int nameL = strlen(nameP) + 1;
 	newFile->namePath = malloc(nameL*sizeof(char));
 	if(newFile->namePath == NULL){

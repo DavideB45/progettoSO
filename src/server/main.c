@@ -23,17 +23,15 @@ void read_config(char*);
 int main(void){
 	printf("ciao\n");
 	for (size_t i = 0; i < 10; i++){
-		printf("%lu\t", i);
+		// printf("%lu\t", i);
 		free(NULL);
 	}
 	printf("\n");
 	
+	char cose[100];
+	scanf("%s", cose);
 
-	for(int i = 0; i < 20; i++){
-		if(i%2)
-			break;
-		printf("num %+d\n", i);
-	}
+	printf("lunghezza = %d %s\n", strlen(cose), cose);
 	
 
 	// time_t now = time(NULL);

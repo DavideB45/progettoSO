@@ -11,10 +11,14 @@ CLIENT2OBJ:= api.o utils.o testClient.o
 OBJS:= main.o
 MAINOBJS:= utils.o generalList.o main.o request.o
 
+tutto: 
+	mv ./obj/*.o ./
+	make all
 
 all: $(TARGETS)
-	mv *.out ./bin 
-	rm -f *.o
+	mv *.out ./bin
+	mv *.o ./obj
+#	rm -f *.o
 
 test.out : $(MAINOBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)

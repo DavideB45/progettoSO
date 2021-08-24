@@ -1,4 +1,4 @@
 git pull
 git stage .
-git commit -m mnhgfdcvbhjk
+git commit -m com
 git push

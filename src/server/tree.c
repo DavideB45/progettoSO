@@ -31,6 +31,9 @@ TreeFile* newTreeFile(){
 		return NULL;
 	}
 	
+	newTree->maxUsedFile = 0;
+	newTree->maxUsedSpace = 0;
+
 	newTree->maxFileDim = 0;
 	newTree->maxFileNum = 0;
 
@@ -164,6 +167,7 @@ TreeNode* TreeFileinsert(TreeFile* tree , TreeNode** newNode, ServerFile** remov
 			return NULL;
 		}
 		*removed = toRet->sFile;
+		removeFromLRU(tree, toRet);
 		toRet->sFile = NULL;
 		Pthread_mutex_unlock( &(toRet->lock) );
 	}
@@ -172,6 +176,10 @@ TreeNode* TreeFileinsert(TreeFile* tree , TreeNode** newNode, ServerFile** remov
 	if(tree->root == NULL){
 		tree->root = *newNode;
 		insertToFrontLRU(tree, *newNode);
+		if(tree->maxUsedFile == 0){
+			tree->maxUsedFile = 1;
+		}
+		
 		//per LRU e' sia primo che ultimo
 		endMutexTreeFile(tree);
 		errno = 0;
@@ -180,6 +188,9 @@ TreeNode* TreeFileinsert(TreeFile* tree , TreeNode** newNode, ServerFile** remov
 
 	if(noMutexInsert(tree->root, newNode) == 1){
 		insertToFrontLRU(tree, *newNode);
+		if(tree->maxUsedFile < tree->fileCount){
+			tree->maxUsedFile = tree->fileCount;
+		}
 		endMutexTreeFile(tree);
 		errno = 0;
 		return toRet;
@@ -191,6 +202,7 @@ TreeNode* TreeFileinsert(TreeFile* tree , TreeNode** newNode, ServerFile** remov
 			}
 			toRet->sFile = *removed;
 			*removed = NULL;
+			insertToFrontLRU(tree, toRet);
 			Pthread_mutex_unlock( &(toRet->lock) );
 			errno = EEXIST;
 		} else {
@@ -200,6 +212,7 @@ TreeNode* TreeFileinsert(TreeFile* tree , TreeNode** newNode, ServerFile** remov
 			}
 			toRet->sFile = *removed;
 			*removed = NULL;
+			insertToFrontLRU(tree, toRet);
 			Pthread_mutex_unlock( &(toRet->lock) );
 			errno = EPERM;
 		}
@@ -368,7 +381,7 @@ int moveToFrontLRU(TreeFile* tree, TreeNode* node){
 		errno = EINVAL;
 		return -1;
 	}
-
+	
 	if(node->moreRecentLRU == NULL){
 		/* e' gia' la testa */
 		errno = 0;
@@ -402,40 +415,57 @@ int removeFromLRU(TreeFile* tree, TreeNode* node){
 		return -1;
 	}
 	// aggiorna spazio
-	(tree->fileCount)--;
+	(tree->fileCount) -= 1;
 	// nessuno puo' scrivere mentre faccio la remove
 	// No perche' FILE_DELETED e' usato solo quando 
 	// ho la mutua esclusione sul file
 	(tree->filedim) -= node->sFile->dim;
-	
+	printf("non sei ancora crashato 1\n");
+	fflush(stdout);
 	if(tree->mostRecentLRU == node){
 		/* era la testa */
 		tree->mostRecentLRU = node->lessRecentLRU;
+		printf("non sei ancora crashato 2\n");
+		fflush(stdout);
 		if(node->lessRecentLRU == NULL){
 			/* era l'unico */
 			tree->leastRecentLRU = NULL;
 		} else {
 			/* sistemo nuovo MRU */
+			printf("non sei ancora crashato 3\n");
+			fflush(stdout);
 			tree->mostRecentLRU->moreRecentLRU = NULL;
 		}
+		printf("non sei ancora crashato 4\n");
+		fflush(stdout);
 		node->lessRecentLRU = NULL;
 		node->moreRecentLRU = NULL;
 		errno = 0;
 		return 0;
 	}
 	
+	printf("non sei ancora crashato 5\n");
+	fflush(stdout);
 	if(tree->leastRecentLRU == node){
 		/* era l'ultimo (almeno uno davanti) */
 		tree->leastRecentLRU = node->moreRecentLRU;
+		printf("non sei ancora crashato 6\n");
+		fflush(stdout);
 		tree->leastRecentLRU->lessRecentLRU = NULL;
 		node->lessRecentLRU = NULL;
 		node->moreRecentLRU = NULL;
 		errno = 0;
 		return 0;
 	}
+	printf("non sei ancora crashato 7\n");
+	fflush(stdout);
+	if(node->lessRecentLRU != NULL){
+		node->lessRecentLRU->moreRecentLRU = node->moreRecentLRU;
+	}
+	if(node->moreRecentLRU != NULL){
+		node->moreRecentLRU->lessRecentLRU = node->lessRecentLRU;
+	}
 	
-	node->lessRecentLRU->moreRecentLRU = node->moreRecentLRU;
-	node->moreRecentLRU->lessRecentLRU = node->lessRecentLRU;
 	node->lessRecentLRU = NULL;
 	node->moreRecentLRU = NULL;
 	errno = 0;
@@ -499,6 +529,7 @@ GeneralList* makeSpace(TreeFile* tree, int nFile, int dimSpace){
 		return NULL;
 	}
 	while( currVictim != NULL && (nVictim < nFile || spaceVictim < dimSpace) ){
+		printf("esamino %p, dim %d \n", currVictim, currVictim->sFile->dim);
 		if( Pthread_mutex_lock( &(currVictim->lock) ) == 0){
 			if(currVictim->sFile != NULL && currVictim->sFile->flagUse == 0){
 				currVictim->sFile->flagUse = 1;
@@ -514,6 +545,7 @@ GeneralList* makeSpace(TreeFile* tree, int nFile, int dimSpace){
 			}
 			Pthread_mutex_unlock( &(currVictim->lock) );
 		}
+		currVictim = currVictim->moreRecentLRU;
 	}
 	if(nVictim < nFile || spaceVictim < dimSpace){
 		generalListDestroy(listVictim);
@@ -521,17 +553,15 @@ GeneralList* makeSpace(TreeFile* tree, int nFile, int dimSpace){
 		return NULL;
 	}
 
-	GeneralListNode* listNode = listVictim->head;
-	while(listNode != NULL){
-		removeFromLRU(tree, listNode->elem);
-		( (ServerFile*) listNode->elem)->dim = 0;
-		free(( (ServerFile*) listNode->elem)->data);
-		listNode = listNode->nextPtr;
-	}
+	// GeneralListNode* listNode = listVictim->head;
+	// while(listNode != NULL){
+	// 	removeFromLRU(tree, listNode->elem);
+	// 	listNode = listNode->nextPtr;
+	// }
 	
 	// se qualcuno ricercasse uno di questi elem lo risposterebbe in cima alla LRU
-	// ..x rimuovo dopo da LRU
-	// ..v sposto moveToFrontLRU
+	// ..v rimuovo dopo da LRU
+	// ..x sposto moveToFrontLRU
 	// ..x metto un bit flagReal
 	errno = 0;
 	return listVictim;
