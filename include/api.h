@@ -37,6 +37,13 @@ int closeConnection(const char* sockname);
  */
 int openFile(const char* pathname, int flags);
 
+/** chiude il file PATHNAME
+ * \retval 0 success
+ * \retval -1 sefallisce
+ * \retval errno settato
+ */
+int closeFile(const char* pathname);
+
 /** appende i primi SIZE byte di BUFF al file PATHNAME
  * se DIRNAME non e' nullo viene usato per 
  * salvare eventuali file espulsi

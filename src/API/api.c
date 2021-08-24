@@ -364,7 +364,53 @@ int openFile(const char* pathname, int flags){
 	}
 	if(readns(_sock, &result, sizeof(int)) == -1){
 		return -1;
-	};
+	}
+	if(result != SUCCESS){
+		setErrno(result);
+		return -1;
+	}
+	errno = 0;
+	return 0;
+}
+
+int closeFile(const char* pathname){
+	if(pathname == NULL){
+		errno = EINVAL;
+		return -1;
+	}
+	int op;
+	int result = 0;
+	char* request;
+	int nameLen = strlen(pathname);
+	SET_CLEAN(op);
+	SET_OP(op, CLOSE_FILE);
+	SET_PATH_DIM(op, nameLen);
+	request = malloc(sizeof(int) + nameLen + 1);
+	if(request == NULL){
+		errno = ENOMEM;
+		return -1;
+	}
+	memcpy(request, &op, sizeof(int));
+	memcpy(request, pathname, nameLen + 1);
+	
+	int err;
+	switch(writen(_sock, request, sizeof(int) + nameLen + 1)){
+		case -1:
+			err = errno;
+			free(request);
+			errno = err;
+		return -1;
+		case 0:
+			free(request);
+			errno = ESRCH;
+		return -1;
+		case 1:
+			free(request);
+		break;
+	}
+	if(readns(_sock, &result, sizeof(int)) == -1){
+		return -1;
+	}
 	if(result != SUCCESS){
 		setErrno(result);
 		return -1;
@@ -435,13 +481,12 @@ int appendToFile(const char* pathname, void* buff, size_t size, const char* dirn
 					return -1;
 				}
 			}
-			if(setErrno( result >> 24 ) == -1){
+			if((result >> 24) == SUCCESS){
+				return 0;
+			} else {
+				setErrno(result >> 24);
 				return -1;
 			}
-			if((result >> 24) != SUCCESS){
-				return -1;
-			}
-			return 0;
 		break;
 	}
 }

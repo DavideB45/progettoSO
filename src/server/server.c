@@ -77,25 +77,25 @@ int tryUse(TreeNode* nodePtr, Request* req, int closeOnFail);
 int fileUsePermitted(int client, ServerFile* filePtr);
 
 // chiude la connessione con il client
-int closeConnection(int client);
+int closeConnectionW(int client);
 // apre un file (open = intero che definisce opzioni)
-int openFile(Request* req, TreeNode** nodePtrP);
+int openFileW(Request* req, TreeNode** nodePtrP);
 // scrive al client il contenuto del file
-int readFile(Request* req, ServerFile* filePtr);
+int readFileW(Request* req, ServerFile* filePtr);
 // scrive al client il contenuto di N files
-int readNFiles(Request* req);
+int readNFilesW(Request* req);
 // scrive nel file richiesto dal client
-int writeFile(Request* req, ServerFile* filePtr);
+int writeFileW(Request* req, ServerFile* filePtr);
 // appende al file richiesto dal client
-int appendToFile(Request* req, TreeNode* nodePtr,int threadId);
+int appendToFileW(Request* req, TreeNode* nodePtr,int threadId);
 // attiva la mutua esclusione su un file
 int lockFileW(Request* req, TreeNode* nodePtr, int threadId);
 // termina la mutua esclusione su un file
 int unlockFileW(Request* req, TreeNode* nodePtr, int threadId);
 // chiude il file per il client
-int closeFile(Request* req, TreeNode* nodePtr);
+int closeFileW(Request* req, TreeNode* nodePtr, int threadId);
 //rimuove il file dal server
-int removeFile(Request* req, TreeNode* nodePtr);
+int removeFileW(Request* req, TreeNode* nodePtr);
 
 // dopo la rimozione di un file pulisce la lista di richieste ancora in coda
 void informClientDelete(ServerFile* filePtr);
@@ -708,7 +708,7 @@ void manageRequest(Request* req, int threadId){
 	do{
 		switch(GET_OP(req->oper)){
 		case CLOSE_CONNECTION:
-			/* non dovrebbe arrivare qui' a seconda dell'implementazione */
+			/* non dovrebbe arrivare qui' */
 			DISCONN_CLIENT(req->client);
 			printf("CLOSE_CONNECTION\n");
 		break;
@@ -720,7 +720,7 @@ void manageRequest(Request* req, int threadId){
 				if(result == NONE){
 					if(nodePtr == NULL){
 						/* file non trovato forse lo creo*/
-						result = openFile(req, &nodePtr);
+						result = openFileW(req, &nodePtr);
 					} else {
 						/* file trovato (eseguo la richiesta) */
 						// da sistemare per delayed
@@ -732,7 +732,7 @@ void manageRequest(Request* req, int threadId){
 							result = DELAYED;
 						break;
 						case 1:
-							result = openFile(req, &nodePtr);
+							result = openFileW(req, &nodePtr);
 						break;
 						}
 					}
@@ -744,7 +744,7 @@ void manageRequest(Request* req, int threadId){
 					era stata gia' trovata da un altro client in precedenza
 					quindi e' stata rimossa dalla lista di richieste del file */
 			} else {
-				result = openFile(req, &nodePtr);
+				result = openFileW(req, &nodePtr);
 			}
 			int flag = 0;
 			if(GET_O_CREATE(req->oper)){
@@ -770,15 +770,15 @@ void manageRequest(Request* req, int threadId){
 		break;
 		case READ_FILE:
 			printf("READ_FILE\n");
-			readFile(req, (ServerFile*)nodePtr);
+			readFileW(req, (ServerFile*)nodePtr);
 		break;
 		case READ_N_FILES:
 			printf("READ_N_FILES\n");
-			readNFiles(req);
+			readNFilesW(req);
 		break;
 		case WRITE_FILE:
 			printf("WRITE_FILE\n");
-			writeFile(req, (ServerFile*)nodePtr);
+			writeFileW(req, (ServerFile*)nodePtr);
 		break;
 		case APPEND_TO_FILE:
 			printf("APPEND_TO_FILE\n");
@@ -798,13 +798,13 @@ void manageRequest(Request* req, int threadId){
 							result = DELAYED;
 						break;
 						case 1:
-							result = appendToFile(req, nodePtr, threadId);
+							result = appendToFileW(req, nodePtr, threadId);
 						break;
 						}
 					}
 				}
 			} else {
-				result = appendToFile(req, nodePtr, threadId);
+				result = appendToFileW(req, nodePtr, threadId);
 			}
 		break;
 		case LOCK_FILE:
@@ -861,11 +861,34 @@ void manageRequest(Request* req, int threadId){
 		break;
 		case CLOSE_FILE:
 			printf("CLOSE_FILE\n");
-			closeFile(req, nodePtr);
+			if(req->sFileName == NULL){
+				nodePtr = getFileFromSocket(req, &result, threadId);
+				if(result == NONE){
+					if(nodePtr == NULL){
+						sendClientFatalError(req->client, NO_SUCH_FILE_F);
+						result = FAILED_STOP;
+					} else {
+						/* file trovato (eseguo la richiesta) */
+						switch(tryUse(nodePtr, req, FALSE)){
+						case -1:
+							result = FAILED_STOP;
+						break;
+						case 0:
+							result = DELAYED;
+						break;
+						case 1:
+							result = closeFileW(req, nodePtr, threadId);
+						break;
+						}
+					}
+				}
+			} else {
+				result = closeFileW(req, nodePtr, threadId);
+			}
 		break;
 		case REMOVE_FILE:
 			printf("REMOVE_FILE\n");
-			removeFile(req, nodePtr);
+			removeFileW(req, nodePtr);
 		break;
 		default:
 			printf("operazione sconosciuta\n");
@@ -914,7 +937,7 @@ void manageRequest(Request* req, int threadId){
 	
 	if(result == FILE_DELETED){
 		/* mi occupo di informare gli altri client*/
-		removeFile(req, nodePtr);
+		removeFileW(req, nodePtr);
 	}
 	
 	
@@ -1058,11 +1081,12 @@ int fileUsePermitted(int client, ServerFile* filePtr){
 		// se sono il possessore della lock dopo la mia operazione il thread deve smettere
 		// usare 'completed_stop' o come si chiama quando eseguo un' operazione
 		// in mutua esclusione
-int closeConnection(int client){
+int closeConnectionW(int client){
 	return FAILED_STOP;
 }
 
-int openFile(Request* req, TreeNode** nodePtrP){
+
+int openFileW(Request* req, TreeNode** nodePtrP){
 	TreeNode* nodePtr = *nodePtrP;
 	LogOp* logInfo;
 	// esiste ma lo voglio creare
@@ -1203,19 +1227,19 @@ int openFile(Request* req, TreeNode** nodePtrP){
 	
 }
 
-int readFile(Request* req, ServerFile* filePtr){
+int readFileW(Request* req, ServerFile* filePtr){
 	return FAILED_STOP;
 }
-int readNFiles(Request* req){
+int readNFilesW(Request* req){
 	return FAILED_STOP;
 }
-int writeFile(Request* req, ServerFile* filePtr){
+int writeFileW(Request* req, ServerFile* filePtr){
 	// non e' che un append + fancy
 	return FAILED_STOP;
 }
 
 // ritorna un intero diviso in 2
-int appendToFile(Request* req, TreeNode* nodePtr, int threadId){
+int appendToFileW(Request* req, TreeNode* nodePtr, int threadId){
 	//////////////////////devi chiudere il file qunado non esiste
 	int size = 0;
 	LogOp* logInfo;
@@ -1484,6 +1508,7 @@ int appendToFile(Request* req, TreeNode* nodePtr, int threadId){
 	return COMPLETED_CONT;
 }
 
+
 int lockFileW(Request* req, TreeNode* nodePtr, int threadId){
 	LogOp* infoLog;
 	if(!isInGeneralList( &(req->client), nodePtr->sFile->openList )){
@@ -1512,6 +1537,8 @@ int lockFileW(Request* req, TreeNode* nodePtr, int threadId){
 	
 	return COMPLETED_STOP;
 }
+
+
 int unlockFileW(Request* req, TreeNode* nodePtr, int threadId){
 	LogOp* infoLog;
 	if(!isInGeneralList( &(req->client), nodePtr->sFile->openList )){
@@ -1540,11 +1567,38 @@ int unlockFileW(Request* req, TreeNode* nodePtr, int threadId){
 	
 	return COMPLETED_CONT;
 }
-int closeFile(Request* req, TreeNode* nodePtr){
-	return FAILED_STOP;
+
+// se ho la lock la tolgo e inizio a gestire
+int closeFileW(Request* req, TreeNode* nodePtr, int threadId){
+	LogOp* infoLog;
+	if(!isInGeneralList( &(req->client), nodePtr->sFile->openList )){
+		infoLog = newLogOp(CLOSE_FILE, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
+		LOG_INSERT(infoLog);
+		sendClientError(req->client, FILE_NOT_OPEN);
+		return FAILED_CONT;
+	}
+	
+	generalListRemove( &(req->client), nodePtr->sFile->openList);
+	if(nodePtr->sFile->flagO_lock == 1){
+		if(Pthread_mutex_lock( &(nodePtr->lock) ) == 0){
+			nodePtr->sFile->flagO_lock = 0;
+			nodePtr->sFile->lockOwner = -1;
+			Pthread_mutex_unlock( &(nodePtr->lock) );
+		}
+		clientClose(req->client, nodePtr, TRUE, resourceTable);
+	} else {
+		clientClose(req->client, nodePtr, FALSE, resourceTable);
+	}
+	
+	infoLog = newLogOp(CLOSE_FILE, req->sFileName, req->client, threadId, 1, 0, sizeof(int));
+	LOG_INSERT(infoLog);
+	int res = SUCCESS;
+	sendClientResult(req->client, &res, sizeof(int));
+	return COMPLETED_CONT;
 }
+
 // informare il file di log
-int removeFile(Request* req, TreeNode* nodePtr){
+int removeFileW(Request* req, TreeNode* nodePtr){
 	ServerFile* filePtr = TreeFileRemove(fileStorage, nodePtr);
 	if(filePtr == NULL){
 		// non e' possibile
