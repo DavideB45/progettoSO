@@ -474,7 +474,7 @@ int writeFile(const char* pathname, const char* dirname){
 		return -1;
 	}
 	memcpy(req, &op, sizeof(int));
-	memcpy(req, pathname, nameLen + 1);
+	memcpy(req + sizeof(int), pathname, nameLen + 1);
 	memcpy(req + sizeof(int) + nameLen + 1, &(infoFile.st_size), sizeof(int));
 	memcpy(req + 2*sizeof(int) + nameLen + 1, fileDup, infoFile.st_size);
 	free(fileDup);
@@ -596,6 +596,66 @@ int appendToFile(const char* pathname, void* buff, size_t size, const char* dirn
 	}
 }
 
+int readFile(const char* pathname, void** buff, size_t* size){
+	if(pathname == NULL || buff == NULL || size == NULL){
+		errno = EINVAL;
+		return -1;
+	}
+	int op;
+	int nameLen = strlen(pathname);
+	char* req;
+	SET_CLEAN(op);
+	SET_OP(op, READ_FILE);
+	SET_PATH_DIM(op, nameLen);
+	req = malloc(sizeof(int) + nameLen + 1);
+	if(req == NULL){
+		errno = ENOMEM;
+		return -1;
+	}
+	memcpy(req, &op, sizeof(int));
+	memcpy(req + sizeof(int), pathname, nameLen + 1);
+
+	int err;
+
+	switch(writen(_sock, req, sizeof(int) + nameLen + 1)){
+	case -1:
+		err = errno;
+		free(req);
+		errno = err;
+	return -1;
+	case 0:
+		free(req);
+		errno = ESRCH;
+	return -1;
+	case 1:
+		free(req);
+	break;
+	}
+
+	int result;
+	if(readns(_sock, &result, sizeof(int)) != 0){
+		return -1;
+	}
+	if(result != SUCCESS){
+		setErrno(result);
+		return -1;
+	}
+	if(readns(_sock, &size, sizeof(int)) != 0){
+		return -1;
+	}
+	*buff = malloc((*size)*sizeof(char));
+	if(*buff == NULL){
+		errno = ENOMEM;
+		return -1;
+	}
+	if(readns(_sock, *buff, *size) != 0){
+		free(*buff);
+		return -1;
+	}
+	errno = 0;
+	return 0;
+}
+
 int lockFile(const char* pathname){
 	if(pathname == NULL){
 		errno = EINVAL;
@@ -640,9 +700,7 @@ int lockFile(const char* pathname){
 		errno = 0;
 		return 0;
 	} else {
-		if(setErrno(result) == -1){
-			setErrno(result);
-		}
+		setErrno(result);
 		return -1;
 	}
 }
@@ -691,11 +749,55 @@ int unlockFile(const char* pathname){
 		errno = 0;
 		return 0;
 	} else {
-		if(setErrno(result) == -1){
-			setErrno(result);
-		}
+		setErrno(result);
 		return -1;
 	}
 }
 
+int removeFile(const char* pathname){
+	if(pathname == NULL){
+		errno = EINVAL;
+		return -1;
+	}
+	int op;
+	int nameLen = strlen(pathname);
+	char* req;
+	SET_CLEAN(op);
+	SET_OP(op, REMOVE_FILE);
+	SET_PATH_DIM(op, nameLen);
+	req = malloc(sizeof(int) + nameLen + 1);
+	if(req == NULL){
+		errno = ENOMEM;
+		return -1;
+	}
+	memcpy(req, &op, sizeof(int));
+	memcpy(req + sizeof(int), pathname, nameLen + 1);
+	
+	int err;
+	switch(writen(_sock, req, sizeof(int) + nameLen + 1)){
+	case -1:
+		err = errno;
+		free(req);
+		errno = err;
+	return -1;
+	case 0:
+		free(req);
+		errno = ESRCH;
+	return -1;
+	case 1:
+		free(req);
+	break;
+	}
 
+	int result = 0;
+	if(readns(_sock, &result, sizeof(int)) != 0){
+		return -1;
+	}
+	if(result == SUCCESS){
+		errno = 0;
+		return 0;
+	} else {
+		setErrno(result);
+		return -1;
+	}
+}

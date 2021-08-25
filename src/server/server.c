@@ -81,7 +81,7 @@ int closeConnectionW(int client);
 // apre un file (open = intero che definisce opzioni)
 int openFileW(Request* req, TreeNode** nodePtrP);
 // scrive al client il contenuto del file
-int readFileW(Request* req, ServerFile* filePtr);
+int readFileW(Request* req, TreeNode *Ptr, int threadId);
 // scrive al client il contenuto di N files
 int readNFilesW(Request* req);
 // scrive nel file richiesto dal client
@@ -95,7 +95,7 @@ int unlockFileW(Request* req, TreeNode* nodePtr, int threadId);
 // chiude il file per il client
 int closeFileW(Request* req, TreeNode* nodePtr, int threadId);
 //rimuove il file dal server
-int removeFileW(Request* req, TreeNode* nodePtr);
+int removeFileW(Request* req, TreeNode* nodePtr, int threadId);
 
 // dopo la rimozione di un file pulisce la lista di richieste ancora in coda
 void informClientDelete(ServerFile* filePtr);
@@ -769,7 +769,30 @@ void manageRequest(Request* req, int threadId){
 		break;
 		case READ_FILE:
 			printf("READ_FILE\n");
-			readFileW(req, (ServerFile*)nodePtr);
+			if(req->sFileName == NULL){
+				nodePtr = getFileFromSocket(req, &result, threadId);
+				if(result == NONE){
+					if(nodePtr == NULL){
+						sendClientFatalError(req->client, NO_SUCH_FILE_F);
+						result = FAILED_STOP;
+					} else {
+						/* file trovato (eseguo la richiesta) */
+						switch(tryUse(nodePtr, req, FALSE)){
+						case -1:
+							result = FAILED_STOP;
+						break;
+						case 0:
+							result = DELAYED;
+						break;
+						case 1:
+							result = readFileW(req, nodePtr, threadId);
+						break;
+						}
+					}
+				}
+			} else {
+				result = readFileW(req, nodePtr, threadId);
+			}
 		break;
 		case READ_N_FILES:
 			printf("READ_N_FILES\n");
@@ -910,10 +933,34 @@ void manageRequest(Request* req, int threadId){
 		break;
 		case REMOVE_FILE:
 			printf("REMOVE_FILE\n");
-			removeFileW(req, nodePtr);
+			if(req->sFileName == NULL){
+				nodePtr = getFileFromSocket(req, &result, threadId);
+				if(result == NONE){
+					if(nodePtr == NULL){
+						sendClientFatalError(req->client, NO_SUCH_FILE_F);
+						result = FAILED_STOP;
+					} else {
+						/* file trovato (eseguo la richiesta) */
+						switch(tryUse(nodePtr, req, FALSE)){
+						case -1:
+							result = FAILED_STOP;
+						break;
+						case 0:
+							result = DELAYED;
+						break;
+						case 1:
+							result = removeFileW(req, nodePtr, threadId);
+						break;
+						}
+					}
+				}
+			} else {
+				result = removeFileW(req, nodePtr, threadId);
+			}
 		break;
 		default:
-			printf("operazione sconosciuta\n");
+			printf("operazione sconosciuta ");
+			printf("%d\n", GET_OP(req->oper));
 		break;
 		}
 
@@ -948,10 +995,14 @@ void manageRequest(Request* req, int threadId){
 
 	}while( req != NULL && (result == FAILED_CONT || result == COMPLETED_CONT) );
 	
+	// non credo si possa fare senza lock
 	if(nodePtr != NULL && result != FILE_DELETED && result != DELAYED){
 		if(startMutexTreeFile(fileStorage) == 0){
-			if(nodePtr->sFile != NULL && nodePtr->sFile->flagUse == 0){
-				moveToFrontLRU(fileStorage, nodePtr);	
+			if(Pthread_mutex_lock( &(nodePtr->lock) )){
+				if(nodePtr->sFile != NULL && nodePtr->sFile->flagUse == 0){
+					moveToFrontLRU(fileStorage, nodePtr);	
+				}
+				Pthread_mutex_unlock( &(nodePtr->lock) );
 			}
 			endMutexTreeFile(fileStorage);
 		}
@@ -959,7 +1010,7 @@ void manageRequest(Request* req, int threadId){
 	
 	if(result == FILE_DELETED){
 		/* mi occupo di informare gli altri client*/
-		removeFileW(req, nodePtr);
+		removeFileW(req, nodePtr, threadId);
 	}
 	
 	
@@ -1250,9 +1301,49 @@ int openFileW(Request* req, TreeNode** nodePtrP){
 	
 }
 
-int readFileW(Request* req, ServerFile* filePtr){
-	return FAILED_STOP;
+int readFileW(Request* req, TreeNode *nodePtr, int threadId){
+	LogOp* infoLog;
+	if(!isInGeneralList( &(req->client), nodePtr->sFile->openList )){
+		infoLog = newLogOp(READ_FILE, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
+		LOG_INSERT(infoLog);
+		sendClientError(req->client, FILE_NOT_OPEN);
+		return FAILED_CONT;
+	}
+	char* buffRet = malloc(sizeof(int) + nodePtr->sFile->dim);
+	if(buffRet == NULL){
+		infoLog = newLogOp(READ_FILE, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
+		LOG_INSERT(infoLog);
+		if(nodePtr->sFile->flagO_lock == 1){
+			if(Pthread_mutex_lock( &(nodePtr->lock) )){
+				nodePtr->sFile->flagUse = 0;
+				Pthread_mutex_unlock( &(nodePtr->lock) );
+			}
+			sendClientError(req->client, NO_MEMORY);
+			return FAILED_STOP;
+		} else {
+			sendClientError(req->client, NO_MEMORY);
+			return FAILED_CONT;
+		}
+	}
+	int res = SUCCESS;
+	memcpy(buffRet, &res, sizeof(int));
+	memcpy(buffRet + sizeof(int), nodePtr->sFile->data, nodePtr->sFile->dim);
+	
+	infoLog = newLogOp(READ_FILE, req->sFileName, req->client, threadId, 1, 0, sizeof(int) + nodePtr->sFile->dim);
+	LOG_INSERT(infoLog);
+	if(nodePtr->sFile->flagO_lock == 1){
+		if(Pthread_mutex_lock( &(nodePtr->lock) )){
+			nodePtr->sFile->flagUse = 0;
+			Pthread_mutex_unlock( &(nodePtr->lock) );
+		}
+		sendClientResult(req->client, buffRet, sizeof(int) + nodePtr->sFile->dim);
+		return COMPLETED_STOP;
+	} else {
+		sendClientResult(req->client, buffRet, sizeof(int) + nodePtr->sFile->dim);
+		return COMPLETED_CONT;
+	}
 }
+
 int readNFilesW(Request* req){
 	return FAILED_STOP;
 }
@@ -1663,19 +1754,36 @@ int closeFileW(Request* req, TreeNode* nodePtr, int threadId){
 	return COMPLETED_CONT;
 }
 
-// informare il file di log
-int removeFileW(Request* req, TreeNode* nodePtr){
+
+int removeFileW(Request* req, TreeNode* nodePtr, int threadId){
+	LogOp* infoLog;
+	
+	if(nodePtr->sFile->flagO_lock == 0){
+		infoLog = newLogOp(REMOVE_FILE, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
+		LOG_INSERT(infoLog);
+		sendClientError(req->client, FILE_NOT_OPEN);
+		return FAILED_CONT;
+	}
 	ServerFile* filePtr = TreeFileRemove(fileStorage, nodePtr);
 	if(filePtr == NULL){
 		// non e' possibile
+		infoLog = newLogOp(REMOVE_FILE, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
+		LOG_INSERT(infoLog);
+		sendClientError(req->client, UNKNOWN_ERROR);
 		return FAILED_CONT;
 	}
+	
+	infoLog = newLogOp(REMOVE_FILE, req->sFileName, req->client, threadId, 1, -filePtr->dim, sizeof(int));
+	LOG_INSERT(infoLog);
 	clientFileDel(nodePtr, resourceTable, filePtr);
 	informClientDelete(filePtr);
 	destroyServerFile(filePtr);
+	int res = SUCCESS;
+	sendClientResult(req->client, &res, sizeof(int));
 	return COMPLETED_STOP;
 }
 
+// informare il log?
 void informClientDelete(ServerFile* filePtr){
 	int op, buffInt;
 	Request* req = generalListPop(filePtr->requestList);

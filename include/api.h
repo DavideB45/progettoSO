@@ -65,6 +65,15 @@ int writeFile(const char* pathname, const char* dirname);
  */
 int appendToFile(const char* pathname, void* buff, size_t size, const char* dirname);
 
+/** scrive il contenuto del file(sever) PATHNAME
+ * in BUFF e salva la dimensione in SIZE
+ * se non termina con successo buff e size non sono validi
+ * \retval 0 successo
+ * \retval -1 fallimento
+ * \retval errno settato
+ */
+int readFile(const char* pathname, void** buff, size_t* size);
+
 /** attiva la mutua esclusione sul file PATHNAME
  * \retval 0 successo
  * \retval -1 fallimento
@@ -79,6 +88,13 @@ int lockFile(const char* pathname);
  */
 int unlockFile(const char* pathname);
 
-
+/** cancella il file PATHNAME dal server
+ * l'operazione fallisce se non si ha 
+ * la mutua esclusione suil file
+ * \retval 0 successo
+ * \retval -1 fallimento
+ * \retval errno settato
+ */
+int removeFile(const char* pathname);
 
 #endif

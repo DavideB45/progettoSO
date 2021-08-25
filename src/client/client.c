@@ -17,8 +17,6 @@ int main(void){
 	perror("giacomo");
 	openConnection("./servWork/daddu", 2000, tempo);
 	perror("openConnection");
-	closeConnection("./servWork/daddu");
-	perror("closeConnection");
 
 
 	int flag = 0;
