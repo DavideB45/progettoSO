@@ -4,9 +4,10 @@ LIBS:= -lpthread
 
 .PHONY: all clean
 
-TARGETS:= server.out client.out clienttest.out
+TARGETS:= server.out client.out clienttest.out ilClient.out
 SERVEROBJS:= FifoList.o files.o server.o generalList.o request.o tree.o utils.o clientTable.o logFun.o
 CLIENTOBJ:= api.o utils.o client.o
+ILCLIENTOBJ:= api.o utils.o ilClient.o
 CLIENT2OBJ:= api.o utils.o testClient.o
 OBJS:= main.o
 MAINOBJS:= utils.o generalList.o main.o request.o
@@ -26,6 +27,9 @@ test.out : $(MAINOBJS)
 	mv *.o ./bin
 
 server.out : $(SERVEROBJS)
+	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
+
+ilClient.out : $(ILCLIENTOBJ)
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 
 client.out : $(CLIENTOBJ)
