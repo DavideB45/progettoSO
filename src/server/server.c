@@ -83,7 +83,7 @@ int openFileW(Request* req, TreeNode** nodePtrP);
 // scrive al client il contenuto del file
 int readFileW(Request* req, TreeNode *Ptr, int threadId);
 // scrive al client il contenuto di N files
-int readNFilesW(Request* req);
+int readNFilesW(Request* req, int threadId);
 // scrive nel file richiesto dal client
 int writeFileW(Request* req, TreeNode* nodePtr, int threadId);
 // appende al file richiesto dal client
@@ -796,7 +796,7 @@ void manageRequest(Request* req, int threadId){
 		break;
 		case READ_N_FILES:
 			printf("READ_N_FILES\n");
-			readNFilesW(req);
+			readNFilesW(req, threadId);
 		break;
 		case WRITE_FILE:
 			printf("WRITE_FILE\n");
@@ -961,6 +961,9 @@ void manageRequest(Request* req, int threadId){
 		default:
 			printf("operazione sconosciuta ");
 			printf("%d\n", GET_OP(req->oper));
+			sendClientFatalError(req->client, NO_OP_SUPPORT);
+			infoLog = newLogOp(GET_OP(req->oper), NULL, req->client, threadId, 0, 0, sizeof(int));
+			LOG_INSERT(infoLog);
 		break;
 		}
 
@@ -1155,7 +1158,7 @@ int fileUsePermitted(int client, ServerFile* filePtr){
 		// usare 'completed_stop' o come si chiama quando eseguo un' operazione
 		// in mutua esclusione
 int closeConnectionW(int client){
-	return FAILED_STOP;
+	return COMPLETED_STOP;
 }
 
 
@@ -1344,8 +1347,32 @@ int readFileW(Request* req, TreeNode *nodePtr, int threadId){
 	}
 }
 
-int readNFilesW(Request* req){
-	return FAILED_STOP;
+int readNFilesW(Request* req, int threadId){
+	// ritorna traslato di 24
+	LogOp* infoLog;
+	char* buff = NULL;
+	int nFile = (req->oper);
+	int dim = 0;
+	buff = getNElement(&dim, fileStorage, &nFile);
+	if(buff == NULL){
+		infoLog = newLogOp(READ_N_FILES, NULL, req->client, threadId, 0, 0, sizeof(int));
+		LOG_INSERT(infoLog);
+		sendClientError(req->client, NO_MEMORY << 24);
+	}
+	
+	int res;
+	if(nFile > 0){
+		res = (SUCCESS << 24) | nFile;
+	} else {
+		res = (NO_SUCH_FILE << 24);
+		dim = sizeof(int);
+	}
+	memcpy(buff, &res, dim);
+	infoLog = newLogOp(READ_N_FILES, NULL, req->client, threadId, nFile > 0, 0, dim);
+	LOG_INSERT(infoLog);
+	sendClientResult(req->client, buff, dim);
+	free(buff);
+	return COMPLETED_STOP;
 }
 
 

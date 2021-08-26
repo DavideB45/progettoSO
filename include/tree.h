@@ -75,10 +75,10 @@ ServerFile* TreeFileRemove(TreeFile* tree, TreeNode* node);
 TreeNode* TreeFileFind(TreeFile* tree, char* name);
 
 // getNElements
-// restituisce un puntatore ad un 
-char* getNElement(char* message, int dim, const TreeFile* tree, const int N);
+// restituisce un puntatore ad una stringa 
+// che puo' essere usata per rispondere al client
+char* getNElement(int* dim, const TreeFile* tree, int *N);
 
-//refactor
 
 
 ////////////////////////////////// TREE /////////////////////////////////////////

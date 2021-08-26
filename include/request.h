@@ -75,7 +75,8 @@ enum servErrorRet {
 #define SET_PATH_DIM(x, dim) x = x | (dim)
 #define GET_PATH_DIM(x) (x & 0x003fffff)
 
-
+#define SET_N_FILE(x, dim) x = x | (dim)
+#define GET_N_FILE(x) (x & 0x003fffff)
 
 typedef struct Request{
 	int oper;

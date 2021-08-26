@@ -308,11 +308,58 @@ TreeNode* TreeFileFind(TreeFile* tree, char* name){
 	return node;
 }
 
-//getNElements
-//restituisce un puntatore ad un 
-char* getNElement(char* message, int dim, const TreeFile* tree, const int N);
 
-//refactor
+char* getNElement(int* dim, const TreeFile* tree, int* N){
+	if(Pthread_mutex_lock( &(tree->lock) ) != 0){
+		// errno settato
+		return NULL;
+	}
+	*dim = 0;
+	int numFile = 0;
+	char* allFile = calloc(1, sizeof(int));
+	if(allFile == NULL){
+		return NULL;
+	}
+	
+	int allFileDim = sizeof(int);
+	char* newPtr = NULL;
+	int buffInt;
+	TreeNode* currPtr = tree->leastRecentLRU;
+	while(*N != 0 && currPtr != NULL){
+		if(Pthread_mutex_lock( &(currPtr->lock) ) == 0){
+			if(currPtr->sFile != NULL && currPtr->sFile->flagUse == 0){
+				buffInt = strlen(currPtr->name) + 1;
+				newPtr = realloc(allFile, allFileDim + 2*sizeof(int) + currPtr->sFile->dim +buffInt);
+				if(newPtr == NULL){
+					*dim = allFileDim;
+					*N = numFile;
+					Pthread_mutex_unlock( &(currPtr->lock) );
+					Pthread_mutex_unlock( &(tree->lock) );
+					return allFile;
+				} else {
+					(*N)--;
+					allFile = newPtr;
+					numFile++;
+					memcpy(allFile + allFileDim, &buffInt, sizeof(int));
+					allFileDim += sizeof(int);
+					memcpy(allFileDim + allFileDim, currPtr->name, buffInt);
+					allFileDim += buffInt;
+					memcpy(allFile + allFileDim, &(currPtr->sFile->dim), sizeof(int));
+					allFileDim += sizeof(int);
+					memcpy(allFile + allFileDim, currPtr->sFile->data, currPtr->sFile->dim);
+					allFileDim += currPtr->sFile->dim;
+				}
+				Pthread_mutex_unlock( &(currPtr->lock) );
+			}
+		}
+		currPtr = currPtr->moreRecentLRU;
+	}
+	*dim = allFileDim;
+	*N = numFile;
+	Pthread_mutex_unlock( &(tree->lock) );
+	return allFile;
+}
+
 
 ////////////////////////////////// TREE /////////////////////////////////////////
 ////////////////////////////////// NODE /////////////////////////////////////////
@@ -552,12 +599,6 @@ GeneralList* makeSpace(TreeFile* tree, int nFile, int dimSpace){
 		errno = 0;
 		return NULL;
 	}
-
-	// GeneralListNode* listNode = listVictim->head;
-	// while(listNode != NULL){
-	// 	removeFromLRU(tree, listNode->elem);
-	// 	listNode = listNode->nextPtr;
-	// }
 	
 	// se qualcuno ricercasse uno di questi elem lo risposterebbe in cima alla LRU
 	// ..v rimuovo dopo da LRU
