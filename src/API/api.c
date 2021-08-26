@@ -419,6 +419,56 @@ int closeFile(const char* pathname){
 	return 0;
 }
 
+int readNFiles(int N, const char* dirname){
+	if(dirname == NULL){
+		errno = EINVAL;
+		return -1;
+	}
+	
+	int op;
+	SET_CLEAN(op);
+	SET_OP(op, READ_N_FILES);
+	SET_N_FILE(op, N);
+	if(dirname != NULL){
+		SET_DIR_SAVE(op);
+	}
+	switch(writen(_sock, &op, sizeof(int))){
+		case -1:
+			// errno settato
+			return -1;
+		case 0:
+			errno = ESRCH;
+			return -1;
+		case 1:
+		break;
+	}
+	int result;
+	switch(readn(_sock, &result, sizeof(int))){
+		case -1:
+			// errno settato
+			return -1;
+		break;
+		case 0:
+			errno = ESRCH;
+			return -1;
+		break;
+		default:
+			if((result >> 24) == SUCCESS){
+				int nFile = result & 0x00ffffff;
+				saveExFile(_sock, dirname, nFile);
+				if(errno != 0){
+					return -1;
+				}
+				errno = 0;
+				return 0;
+			} else {
+				setErrno(result >> 24);
+				return -1;
+			}
+		break;
+	}
+}
+
 int writeFile(const char* pathname, const char* dirname){
 	if(pathname == NULL){
 		errno = EINVAL;

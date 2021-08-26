@@ -44,6 +44,15 @@ int openFile(const char* pathname, int flags);
  */
 int closeFile(const char* pathname);
 
+/** legge al piu' N file dal server
+ * e li salva in DIRNAME
+ * se N <= 0 salva tutti i file disponibili
+ * \retval numero di file letti ( >= 0)
+ * \retval -1 fallimento
+ * \retval setta errno
+ */
+int readNFiles(int N, const char* dirname);
+
 /** scrive nel file(server) PATHNAME
  * il contenuto del file(locale) PATHNAME
  * ha successo se la chiamata precedente era

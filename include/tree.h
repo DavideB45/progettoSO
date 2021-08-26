@@ -77,7 +77,7 @@ TreeNode* TreeFileFind(TreeFile* tree, char* name);
 // getNElements
 // restituisce un puntatore ad una stringa 
 // che puo' essere usata per rispondere al client
-char* getNElement(int* dim, const TreeFile* tree, int *N);
+char* getNElement(int* dim, TreeFile* tree, int *N);
 
 
 

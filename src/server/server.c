@@ -1361,14 +1361,9 @@ int readNFilesW(Request* req, int threadId){
 	}
 	
 	int res;
-	if(nFile > 0){
-		res = (SUCCESS << 24) | nFile;
-	} else {
-		res = (NO_SUCH_FILE << 24);
-		dim = sizeof(int);
-	}
+	res = (SUCCESS << 24) | nFile;
 	memcpy(buff, &res, dim);
-	infoLog = newLogOp(READ_N_FILES, NULL, req->client, threadId, nFile > 0, 0, dim);
+	infoLog = newLogOp(READ_N_FILES, NULL, req->client, threadId, 1, 0, dim);
 	LOG_INSERT(infoLog);
 	sendClientResult(req->client, buff, dim);
 	free(buff);

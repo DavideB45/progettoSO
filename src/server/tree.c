@@ -309,7 +309,7 @@ TreeNode* TreeFileFind(TreeFile* tree, char* name){
 }
 
 
-char* getNElement(int* dim, const TreeFile* tree, int* N){
+char* getNElement(int* dim, TreeFile* tree, int* N){
 	if(Pthread_mutex_lock( &(tree->lock) ) != 0){
 		// errno settato
 		return NULL;
@@ -342,7 +342,7 @@ char* getNElement(int* dim, const TreeFile* tree, int* N){
 					numFile++;
 					memcpy(allFile + allFileDim, &buffInt, sizeof(int));
 					allFileDim += sizeof(int);
-					memcpy(allFileDim + allFileDim, currPtr->name, buffInt);
+					memcpy(allFile + allFileDim, currPtr->name, buffInt);
 					allFileDim += buffInt;
 					memcpy(allFile + allFileDim, &(currPtr->sFile->dim), sizeof(int));
 					allFileDim += sizeof(int);
