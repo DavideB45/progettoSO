@@ -24,4 +24,8 @@
 -c file1[,file2] : lista di file da rimuovere dal server se presenti;\n\
 -p : abilita le stampe sullo standard output per ogni operazione.\n"
 
+#define IF_PRINT(flag, print)	if(flag){\
+									print;\
+								}
+
 #endif

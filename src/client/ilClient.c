@@ -5,28 +5,30 @@
 #include <stdlib.h>
 #include <unistd.h>
 
+#include <string.h>
 #include <time.h>
+
+int multipleWrite(char* files, char* dirname, int printflag);
 
 int main(int argc, char* argv[]){
 	
 	_Bool printFalg = 0;
 	char* sockName = NULL;
-	int opt;
+	int opt, precOptInd;
     char* ends;
+	char *optargDup;
 	struct timespec delay;
 	delay.tv_sec = 0;
 	delay.tv_nsec = 0;
 
-    while ( (opt = getopt(argc, argv, "hf:w:W:D:r:R+d:t:l:u:c:p")) != -1)
+    while ( (opt = getopt(argc, argv, "hf:w:W:r:Rd:t:l:u:c:p")) != -1)
     {
         switch (opt){
         case 'h':
 			printf(HARG);
 			if(sockName != NULL){
 				closeConnection(sockName);
-				if(printFalg){
-					perror("close connection");
-				}
+				IF_PRINT(printFalg, perror("close connection"));
 			}
 			return 0;
         break;
@@ -43,19 +45,28 @@ int main(int argc, char* argv[]){
 				}
 				if(printFalg)
 					perror("open connection");
-			}	
+				}	
         break;
         case 'w':
-			// optindcosa utile per vedere se c'e' un -D
         break;
         case 'W':
+			precOptInd = optind;
+			optargDup = optarg;
+			opt = getopt(argc, argv, "D:");
+			if(opt == 'D'){// cambiare perche' prende un D qualunque
+				multipleWrite(optargDup, optarg, printFalg);
+			} else {
+				multipleWrite(optargDup, NULL, printFalg);
+				optind = precOptInd;
+			}
         break;
-        case 'D':
-        break;
+		case 'D':
+			printf("D\n");
+		break;
 		case 'r':
 		break;
 		case 'R':
-			printf("%s\n", argv[optind]);
+			// printf("%s\n", argv[optind]);
 		break;
 		case 'd':
 		break;
@@ -87,3 +98,21 @@ int main(int argc, char* argv[]){
     printf("FINE\n");
     return 0;
 }
+
+int multipleWrite(char* files, char* dirname, int printflag){
+
+	char* fileName = strtok(files, ",");
+	while( fileName != NULL){
+		IF_PRINT(printflag, printf("write file %s\n", fileName));
+		if(openFile(fileName, O_CREATE | O_LOCK) == 0){
+			IF_PRINT(printflag, perror("create File"));
+			writeFile(fileName, dirname);
+			IF_PRINT(printflag, perror("write File"));
+			closeFile(fileName);
+			IF_PRINT(printflag, perror("close File"));
+		}
+		fileName = strtok(NULL, ",");
+	}
+	return 1;
+}
+

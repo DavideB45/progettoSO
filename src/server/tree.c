@@ -281,7 +281,6 @@ TreeNode* TreeFileFind(TreeFile* tree, char* name){
 		errno = EPERM;
 		return NULL;
 	}
-
 	TreeNode* node = noMutexGetNode(tree->root, name);
 	
 	if(node == NULL){
@@ -289,11 +288,14 @@ TreeNode* TreeFileFind(TreeFile* tree, char* name){
 		errno = 0;
 		return NULL;
 	}
+	printf("prendo la lock\n");
 	if(Pthread_mutex_lock( &(node->lock) ) != 0){
 		endMutexTreeFile(tree);
 		errno = EPERM;
 		return NULL;
 	}
+	printf("ho la lock\n");
+	fflush(stdout);
 	if(node->sFile == NULL){
 		Pthread_mutex_unlock( &(node->lock) );
 		endMutexTreeFile(tree);
@@ -384,6 +386,9 @@ TreeNode* newTreeNode(ServerFile* sFile, char* name){
 	
 	newNode->leftPtr = NULL;
 	newNode->rightPtr = NULL;
+	newNode->lessRecentLRU = NULL;
+	newNode->moreRecentLRU = NULL;
+
 	int nameL = strlen(name);
 	newNode->name = malloc(nameL + 1);
 	if(newNode->name == NULL){

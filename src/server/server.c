@@ -161,6 +161,7 @@ int main(int argc, char* argv[]){
 	}
 
 	sigaddset(&oldSet, SIGPIPE);
+	sigemptyset(&oldSet);
 	pthread_sigmask(SIG_SETMASK, &oldSet, NULL);
 	
 	dispatcher();
@@ -705,6 +706,7 @@ void manageRequest(Request* req, int threadId){
 	LogOp* infoLog = NULL;
 	enum operResult result = NONE;
 	do{
+		printf("eseguo\n");
 		switch(GET_OP(req->oper)){
 		case CLOSE_CONNECTION:
 			/* non dovrebbe arrivare qui' */
@@ -908,6 +910,8 @@ void manageRequest(Request* req, int threadId){
 			printf("CLOSE_FILE\n");
 			if(req->sFileName == NULL){
 				nodePtr = getFileFromSocket(req, &result, threadId);
+				printf("nodo con il file%p\n", (void*) nodePtr);
+				fflush(stdout);
 				if(result == NONE){
 					if(nodePtr == NULL){
 						sendClientFatalError(req->client, NO_SUCH_FILE_F);
@@ -1001,7 +1005,7 @@ void manageRequest(Request* req, int threadId){
 	// non credo si possa fare senza lock
 	if(nodePtr != NULL && result != FILE_DELETED && result != DELAYED){
 		if(startMutexTreeFile(fileStorage) == 0){
-			if(Pthread_mutex_lock( &(nodePtr->lock) )){
+			if(Pthread_mutex_lock( &(nodePtr->lock) ) == 0){
 				if(nodePtr->sFile != NULL && nodePtr->sFile->flagUse == 0){
 					moveToFrontLRU(fileStorage, nodePtr);	
 				}
@@ -1018,7 +1022,9 @@ void manageRequest(Request* req, int threadId){
 	
 	
 	printf("%d sono in vacanza\n", threadId);
-	destroyRequest(&req);
+	if(req != NULL && result != DELAYED){
+		destroyRequest(&req);
+	}
 	return;
 }
 
@@ -1040,6 +1046,7 @@ TreeNode* getFileFromSocket(Request* req, enum operResult* result, int threadId)
 		/* c'e' spazio */
 		if( readFormSocket(req->client, req->sFileName, dim + 1) == 0){
 			/* tutto ok */
+			req->sFileName[dim] = '\0';
 			printf("%d : nome file = %s\n", threadId, req->sFileName);////////////////////////////////////
 			nodePtr = TreeFileFind(fileStorage, req->sFileName);
 			if(errno != 0){
@@ -1486,6 +1493,7 @@ int appendToFileW(Request* req, TreeNode* nodePtr, int threadId, int logOpKind){
 	}
 	memcpy(toretVict, &numVic, sizeof(int));
 	printf("Controllo se devo fare spazio\n");
+	sleep(1);
 	if(fileStorage->filedim + size > fileStorage->maxFileDim){
 		int missingSpace = fileStorage->filedim + size - fileStorage->maxFileDim;
 		int dataDimFreed = 0;
@@ -1669,11 +1677,11 @@ int appendToFileW(Request* req, TreeNode* nodePtr, int threadId, int logOpKind){
 	}
 	printf("devo solo rispondere\n");
 	
-	sendClientResult(req->client, toretVict, dimVic);
-	for(size_t i = 0; i < dimVic; i++){
-		printf("%d %c\n", toretVict[i], toretVict[i]);
-	}
-	free(toretVict);
+	
+	// for(size_t i = 0; i < dimVic; i++){
+	// 	printf("%d %c\n", toretVict[i], toretVict[i]);
+	// }
+	
 	logInfo = newLogOp(logOpKind, req->sFileName, req->client, threadId, 1, size, dimVic);
 	LOG_INSERT(logInfo);
 
@@ -1682,8 +1690,12 @@ int appendToFileW(Request* req, TreeNode* nodePtr, int threadId, int logOpKind){
 			nodePtr->sFile->flagUse = 0;
 			Pthread_mutex_unlock( &(nodePtr->lock) );
 		}
+		sendClientResult(req->client, toretVict, dimVic);
+		free(toretVict);
 		return COMPLETED_STOP;
 	}
+	sendClientResult(req->client, toretVict, dimVic);
+	free(toretVict);
 	return COMPLETED_CONT;
 }
 

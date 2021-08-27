@@ -329,7 +329,7 @@ int openFile(const char* pathname, int flags){
 	int oper;
 	int strDim = strlen(pathname);
 	sizeofReq = strDim + sizeof(int) + 1;
-	request = malloc(sizeofReq + 1);
+	request = malloc(sizeofReq);
 	if(request == NULL){
 		return -1;
 	}
@@ -391,7 +391,7 @@ int closeFile(const char* pathname){
 		return -1;
 	}
 	memcpy(request, &op, sizeof(int));
-	memcpy(request, pathname, nameLen + 1);
+	memcpy(request + sizeof(int), pathname, nameLen + 1);
 	
 	int err;
 	switch(writen(_sock, request, sizeof(int) + nameLen + 1)){
