@@ -13,8 +13,12 @@
 int dirWrite(char* srcDir, char* endDir, int printflag);
 int multipleWrite(char* files, char* dirname, int printflag);
 
+int multipleRead(char* files, char* saveDir, int printflag);
+
 int multipleLock(char* files, int printflag);
 int multipleUnLock(char* files, int printflag);
+
+int multipleCancel(char* files, int printflag);
 
 int main(int argc, char* argv[]){
 	
@@ -27,7 +31,7 @@ int main(int argc, char* argv[]){
 	delay.tv_sec = 0;
 	delay.tv_nsec = 0;
 
-    while ( (opt = getopt(argc, argv, "hf:w:W:r:Rd:t:l:u:c:p")) != -1){
+    while ( (opt = getopt(argc, argv, "hf:w:W:r:Rt:l:u:c:p")) != -1){
         switch (opt){
         case 'h':
 			printf(HARG);
@@ -78,15 +82,29 @@ int main(int argc, char* argv[]){
 			}
         break;
 		// case 'D':
-		// 	printf("D\n");
 		// break;
 		case 'r':
+			optargDup = optarg;
+			// mettere degli if
+			if(optind < argc){
+				if(argv[optind][0] == '-' && argv[optind][1] == 'd'){
+					opt = getopt(argc, argv, "d:");
+				}
+			}optargDup = optarg;
+			if(opt == 'd'){
+				multipleRead(optargDup, optarg, printFalg);
+			} else {
+				multipleRead(optargDup, NULL, printFalg);
+			}
 		break;
 		case 'R':
+			// se seguito da trattino d faccio
+			// se seguito da n=... guardo se quello dopo ancora e' trattino
+			// legge a caso
 			// printf("%s\n", argv[optind]);
 		break;
-		case 'd':
-		break;
+		// case 'd':
+		// break;
 		case 't':;
 			int msec = strtol(optarg, &ends, 10);
 			if(*ends == '\0'){
@@ -97,10 +115,13 @@ int main(int argc, char* argv[]){
 			}
 		break;
 		case 'l':
+			multipleLock(optarg, printFalg);
 		break;
 		case 'u':
+			multipleUnLock(optarg, printFalg);
 		break;
 		case 'c':
+			multipleCancel(optarg, printFalg);
 		break;
 		case 'p':
 			printFalg = 1;
@@ -120,8 +141,8 @@ int main(int argc, char* argv[]){
 void recWatchDir(char* dir, char* endDir,long int* nFile, int printflag){
 	
 	chdir(dir);
-	char cwd[256] = {0};
-	if(getcwd(cwd, 256) == NULL){
+	char cwd[MAXDIRDIM] = {0};
+	if(getcwd(cwd, MAXDIRDIM) == NULL){
 		perror("no cwd");
 		return;
 	}
@@ -186,12 +207,12 @@ int multipleWrite(char* files, char* dirname, int printflag){
 	int numSucc = 0;
 	char* fileName = strtok(files, ",");
 	while( fileName != NULL){
-		IF_PRINT(printflag, printf("lock file %s\n", fileName));
+		IF_PRINT(printflag, printf("write file %s\n", fileName));
 		if(openFile(fileName, O_CREATE | O_LOCK) == 0){
 			if(writeFile(fileName, dirname) == 0){
 				numSucc++;
 			}
-			IF_PRINT(printflag, perror("lock File"));
+			IF_PRINT(printflag, perror("write File"));
 			closeFile(fileName);
 		}
 		fileName = strtok(NULL, ",");
@@ -199,20 +220,85 @@ int multipleWrite(char* files, char* dirname, int printflag){
 	return numSucc;
 }
 
+
+void createParentDir(char* name){
+	int divPos = 0;
+	while(name[divPos] != '\0'){
+		while(name[divPos] != '/' && name[divPos] != '\0'){
+			divPos++;
+		}
+		if(name[divPos] != '\0'){
+			name[divPos] = '\0';
+			mkdir(name, 0777);
+			name[divPos] = '/';
+			divPos++;
+		}
+	}
+}
+
+int multipleRead(char* files, char* saveDir, int printflag){
+	int numSucc, err;
+	char* fileName = strtok(files, ",");
+	char* buff;
+	char cwd[MAXDIRDIM];
+	FILE* filePtr;
+	if(saveDir != NULL){
+		if(getcwd(cwd, MAXDIRDIM) == NULL){
+			return 0;
+		}
+		if(chdir(saveDir) != 0){
+			return 0;
+		}
+	}
+	int size;
+	while( fileName != NULL){
+		IF_PRINT(printflag, printf("read file %s\n", fileName));
+		if(openFile(fileName, 0) == 0){
+			if(readFile(fileName, &buff, size) == 0){
+				numSucc++;
+				IF_PRINT(printflag, printf("read byte %d\n", size));
+				if(printflag && size < MAXPRINT){
+					for(size_t i = 0; i < size; i++){
+						printf("%c", buff[i]);
+					}
+					printf("\n");
+				}
+				if(saveDir != NULL){
+					createParentDir(fileName + 1);
+					filePtr = fopen(fileName + 1, "a+");
+					if(filePtr != NULL){
+						if(size > 0){
+							fwrite(buff, 1, size, filePtr);
+							IF_PRINT(printflag, perror("read File"));
+						}
+						fclose(filePtr);
+					}
+				} else {
+					IF_PRINT(printflag, perror("read File"));
+				}
+				free(buff);
+			}
+		} else {
+			IF_PRINT(printflag, perror("read File"));
+		}
+		fileName = strtok(NULL, ",");
+	}
+	chdir(cwd);
+	return numSucc;
+}
+
 int multipleLock(char* files, int printflag){
 	int numSucc;
 	char* fileName = strtok(files, ",");
 	while( fileName != NULL){
-		IF_PRINT(printflag, printf("write file %s\n", fileName));
-		if(openFile(fileName, O_CREATE | O_LOCK) == 0){
-			if(lockFile(fileName) == 0){
-				numSucc++;
-			}
-			IF_PRINT(printflag, perror("create File"));
+		IF_PRINT(printflag, printf("lock file %s\n", fileName));
+		if(openFile(fileName, O_LOCK) == 0){
+			numSucc++;
 		}
+		IF_PRINT(printflag, perror("lock File"));
 		fileName = strtok(NULL, ",");
 	}
-	return 1;
+	return numSucc;
 }
 
 int multipleUnLock(char* files, int printflag){
@@ -225,6 +311,20 @@ int multipleUnLock(char* files, int printflag){
 		}
 		IF_PRINT(printflag, perror("unlock File"));
 		closeFile(fileName);
+		fileName = strtok(NULL, ",");
+	}
+	return numSucc;
+}
+
+int multipleCancel(char* files, int printflag){
+	int numSucc;
+	char* fileName = strtok(files, ",");
+	while( fileName != NULL){
+		IF_PRINT(printflag, printf("cancel file %s\n", fileName));
+		if(removeFile(fileName) == 0){
+			numSucc++;
+		}
+		IF_PRINT(printflag, perror("cancel File"));
 		fileName = strtok(NULL, ",");
 	}
 	return numSucc;
