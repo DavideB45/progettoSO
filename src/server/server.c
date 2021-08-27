@@ -1450,7 +1450,7 @@ int appendToFileW(Request* req, TreeNode* nodePtr, int threadId, int logOpKind){
 		LOG_INSERT(logInfo);
 		return FAILED_CONT;
 	}
-	printf("ho letto %d lettere : %s\n", size, req->forEdit);
+	printf("ho letto %d lettere :\n", size);
 	if(!isInGeneralList(&(req->client), nodePtr->sFile->openList)){
 		sendClientError(req->client, FILE_NOT_OPEN << 24);
 		logInfo = newLogOp(logOpKind, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
@@ -1558,7 +1558,7 @@ int appendToFileW(Request* req, TreeNode* nodePtr, int threadId, int logOpKind){
 				printf("checkpoint 2.3 %d\n", currVic->sFile->dim);
 				memcpy(toretVict + oldDim, &currVic->sFile->dim, sizeof(int));
 				oldDim += sizeof(int);
-				printf("checkpoint 2.4 %s\n", currVic->sFile->data);
+				printf("checkpoint 2.4 \n");
 				memcpy(toretVict + oldDim, currVic->sFile->data, currVic->sFile->dim);
 				printf("checkpoint 2.5\n");
 				for(size_t i = 0; i < dimVic; i++){

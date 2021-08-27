@@ -106,4 +106,8 @@ int unlockFile(const char* pathname);
  */
 int removeFile(const char* pathname);
 
+/** attiva le stampe di informazioni sullo STDOUT
+ */
+void enablePrint(void);
+
 #endif

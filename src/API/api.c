@@ -20,6 +20,12 @@
 int _sock = -1;
 char* _sockName = NULL;
 int resDim = 0;
+int printInfo = 0;
+
+#define IF_PRINT(print)	if(printInfo){\
+							print;\
+						}
+
 
 ///////////////////////////////////////////////////////////////////////////////////////////
 ////////////////////////////////////////// UTILS //////////////////////////////////////////
@@ -163,15 +169,14 @@ static void saveExFile(int fd,const char* dirname, int num){
 			errno = err;
 			return;
 		}
-		printf("namelen = %d\n", nameLen);
-		name = malloc(nameLen*sizeof(char));
+		name = malloc(nameLen*sizeof(char) + 2);
 		if(name == NULL){
 			fchdir(currDir);
 			close(currDir);
 			errno = ENOMEM;
 			return;
 		}
-		if(readns(fd, name, nameLen) != 0){
+		if(readns(fd, name + 2, nameLen) != 0){
 			int err = errno;
 			free(name);
 			fchdir(currDir);
@@ -179,7 +184,6 @@ static void saveExFile(int fd,const char* dirname, int num){
 			errno = err;
 			return;
 		}
-		printf("name = %s\n",name);
 		
 		
 		if(readns(fd, &dataLen, sizeof(int)) != 0){
@@ -190,7 +194,7 @@ static void saveExFile(int fd,const char* dirname, int num){
 			errno = err;
 			return;
 		}
-		printf("data dim = %d\n", dataLen);
+		IF_PRINT( printf("byte download= %d\n", dataLen) );
 		if(dataLen != 0){
 			data = malloc(dataLen*sizeof(char));
 			if(data == NULL){
@@ -217,6 +221,8 @@ static void saveExFile(int fd,const char* dirname, int num){
 		
 		
 		// faccio le cos
+		name[0] = '.';
+		name[1] = '/';
 		createParentDir(name);
 		if(filePtr = fopen(name, "a+"), filePtr == 0){
 			perror("open O_CREAT");
@@ -540,6 +546,7 @@ int writeFile(const char* pathname, const char* dirname){
 			errno = ESRCH;
 			return -1;
 		case 1:
+			IF_PRINT( printf("byte upload = %ld\n", infoFile.st_size) );
 			free(req);
 		break;
 	}
@@ -850,4 +857,8 @@ int removeFile(const char* pathname){
 		setErrno(result);
 		return -1;
 	}
+}
+
+void enablePrint(void){
+	printInfo = 1;
 }
