@@ -6,6 +6,7 @@
 #include <unistd.h>
 
 #include <sys/types.h>
+#include <sys/stat.h>
 #include <dirent.h>
 #include <string.h>
 #include <time.h>
@@ -14,6 +15,7 @@ int dirWrite(char* srcDir, char* endDir, int printflag);
 int multipleWrite(char* files, char* dirname, int printflag);
 
 int multipleRead(char* files, char* saveDir, int printflag);
+int multipleRandomRead(char* N, char* saveDir, int printflag);
 
 int multipleLock(char* files, int printflag);
 int multipleUnLock(char* files, int printflag);
@@ -24,7 +26,7 @@ int main(int argc, char* argv[]){
 	
 	_Bool printFalg = 0;
 	char* sockName = NULL;
-	int opt, precOptInd;
+	int opt;
     char* ends;
 	char *optargDup;
 	struct timespec delay;
@@ -90,7 +92,7 @@ int main(int argc, char* argv[]){
 				if(argv[optind][0] == '-' && argv[optind][1] == 'd'){
 					opt = getopt(argc, argv, "d:");
 				}
-			}optargDup = optarg;
+			}
 			if(opt == 'd'){
 				multipleRead(optargDup, optarg, printFalg);
 			} else {
@@ -98,10 +100,26 @@ int main(int argc, char* argv[]){
 			}
 		break;
 		case 'R':
-			// se seguito da trattino d faccio
-			// se seguito da n=... guardo se quello dopo ancora e' trattino
-			// legge a caso
-			// printf("%s\n", argv[optind]);
+			optargDup = optarg;
+			// mettere degli if
+			if(optind < argc){
+				if(argv[optind][0] == '-' && argv[optind][1] == 'd'){
+					opt = getopt(argc, argv, "d:");
+					if(opt == 'd'){
+						multipleRandomRead(NULL, optarg, printFalg);
+					}
+				} else {
+					if(argv[optind][0] == 'n' && argv[optind][1] == '='){
+						int numP = optind;
+						if(optind + 1 < argc && argv[optind + 1][0] == '-' && argv[optind + 1][1] == 'd'){
+							opt = getopt(argc, argv, "d:");
+							if(opt == 'd'){
+								multipleRandomRead(argv[numP] + 2, optarg, printFalg);
+							}
+						}
+					}
+				}
+			}
 		break;
 		// case 'd':
 		// break;
@@ -134,9 +152,14 @@ int main(int argc, char* argv[]){
         }
 		nanosleep(&delay, NULL);
     }
+	if(sockName != NULL){
+		closeConnection(sockName);
+	}
+	
     printf("FINE\n");
     return 0;
 }
+
 
 void recWatchDir(char* dir, char* endDir,long int* nFile, int printflag){
 	
@@ -237,7 +260,7 @@ void createParentDir(char* name){
 }
 
 int multipleRead(char* files, char* saveDir, int printflag){
-	int numSucc, err;
+	int numSucc;
 	char* fileName = strtok(files, ",");
 	char* buff;
 	char cwd[MAXDIRDIM];
@@ -250,13 +273,13 @@ int multipleRead(char* files, char* saveDir, int printflag){
 			return 0;
 		}
 	}
-	int size;
+	size_t size;
 	while( fileName != NULL){
 		IF_PRINT(printflag, printf("read file %s\n", fileName));
 		if(openFile(fileName, 0) == 0){
-			if(readFile(fileName, &buff, size) == 0){
+			if(readFile(fileName,(void**) &buff, &size) == 0){
 				numSucc++;
-				IF_PRINT(printflag, printf("read byte %d\n", size));
+				IF_PRINT(printflag, printf("read byte %ld\n", size));
 				if(printflag && size < MAXPRINT){
 					for(size_t i = 0; i < size; i++){
 						printf("%c", buff[i]);
@@ -287,6 +310,25 @@ int multipleRead(char* files, char* saveDir, int printflag){
 	return numSucc;
 }
 
+int multipleRandomRead(char* N, char* saveDir, int printflag){
+	int readNum = -1;
+	char* end;
+	if(N != NULL){
+		readNum = strtol(N, &end, 10);
+		if(*end != '\0'){
+			readNum = -1;
+		}
+	}
+	readNum = readNFiles(readNum, saveDir);
+	if(readNum >= 0 && printflag){
+		printf("letti %d file\n", readNum);
+	} else {
+		IF_PRINT(printflag, perror("readN"));
+	}
+	return readNum;
+}
+
+
 int multipleLock(char* files, int printflag){
 	int numSucc;
 	char* fileName = strtok(files, ",");
@@ -315,6 +357,7 @@ int multipleUnLock(char* files, int printflag){
 	}
 	return numSucc;
 }
+
 
 int multipleCancel(char* files, int printflag){
 	int numSucc;

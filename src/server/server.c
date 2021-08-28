@@ -1369,7 +1369,7 @@ int readNFilesW(Request* req, int threadId){
 	
 	int res;
 	res = (SUCCESS << 24) | nFile;
-	memcpy(buff, &res, dim);
+	memcpy(buff, &res, sizeof(int));
 	infoLog = newLogOp(READ_N_FILES, NULL, req->client, threadId, 1, 0, dim);
 	LOG_INSERT(infoLog);
 	sendClientResult(req->client, buff, dim);

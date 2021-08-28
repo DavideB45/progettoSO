@@ -107,7 +107,7 @@ static int readns(int fd, void* buff, ssize_t size){
 	}
 }
 
-void createParentDir(char* name){
+static void createParentDir(char* name){
 	int divPos = 0;
 	while(name[divPos] != '\0'){
 		while(name[divPos] != '/' && name[divPos] != '\0'){
@@ -169,6 +169,7 @@ static void saveExFile(int fd,const char* dirname, int num){
 			errno = err;
 			return;
 		}
+		printf("nameLen = %d\n", nameLen);
 		name = malloc(nameLen*sizeof(char) + 2);
 		if(name == NULL){
 			fchdir(currDir);
@@ -430,10 +431,16 @@ int readNFiles(int N, const char* dirname){
 		errno = EINVAL;
 		return -1;
 	}
-	
+	if(N == 0){
+		errno = 0;
+		return 0;
+	}
 	int op;
 	SET_CLEAN(op);
 	SET_OP(op, READ_N_FILES);
+	if(N < 0){
+		N = 0;
+	}
 	SET_N_FILE(op, N);
 	if(dirname != NULL){
 		SET_DIR_SAVE(op);
@@ -461,12 +468,13 @@ int readNFiles(int N, const char* dirname){
 		default:
 			if((result >> 24) == SUCCESS){
 				int nFile = result & 0x00ffffff;
+				printf("file letti %d\n", nFile);
 				saveExFile(_sock, dirname, nFile);
 				if(errno != 0){
 					return -1;
 				}
 				errno = 0;
-				return 0;
+				return nFile;
 			} else {
 				setErrno(result >> 24);
 				return -1;

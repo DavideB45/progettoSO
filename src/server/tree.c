@@ -326,6 +326,10 @@ char* getNElement(int* dim, TreeFile* tree, int* N){
 	int allFileDim = sizeof(int);
 	char* newPtr = NULL;
 	int buffInt;
+	if(*N == 0){
+		*N = -1;
+	}
+	
 	TreeNode* currPtr = tree->leastRecentLRU;
 	while(*N != 0 && currPtr != NULL){
 		if(Pthread_mutex_lock( &(currPtr->lock) ) == 0){
@@ -399,6 +403,7 @@ TreeNode* newTreeNode(ServerFile* sFile, char* name){
 		return NULL;
 	}
 	newNode->name = strncpy(newNode->name, name, nameL + 1);
+	newNode->name[nameL] = '\0';
 	return newNode;
 }
 
