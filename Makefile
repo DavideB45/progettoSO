@@ -4,13 +4,10 @@ LIBS:= -lpthread
 
 .PHONY: all clean
 
-TARGETS:= server.out client.out clienttest.out ilClient.out
+TARGETS:= server.out clienttest.out ilClient.out
 SERVEROBJS:= FifoList.o files.o server.o generalList.o request.o tree.o utils.o clientTable.o logFun.o
-CLIENTOBJ:= api.o utils.o client.o
 ILCLIENTOBJ:= api.o utils.o ilClient.o
 CLIENT2OBJ:= api.o utils.o testClient.o
-OBJS:= main.o
-MAINOBJS:= utils.o generalList.o main.o request.o
 
 tutto: 
 	mv ./obj/*.o ./
@@ -21,19 +18,11 @@ all: $(TARGETS)
 	mv *.o ./obj
 #	rm -f *.o
 
-test.out : $(MAINOBJS)
-	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
-	mv *.out ./bin
-	mv *.o ./bin
-
 server.out : $(SERVEROBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
 
 ilClient.out : $(ILCLIENTOBJ)
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
-
-client.out : $(CLIENTOBJ)
-	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)	
 
 clienttest.out : $(CLIENT2OBJ)
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
@@ -41,6 +30,15 @@ clienttest.out : $(CLIENT2OBJ)
 %.o : src/*/%.c
 	$(CC) $(CFLAGS) $< -c 
 
+test1 : 
+	./creafileA.sh
+	valgrind --leak-check=full ./bin/server.out &
+	
+
 clean : 
 	-rm ./obj/*.o *.out
 	-rm ./bin/* 
+	-rm -r ./fileXtestLRU
+	-rm -r ./filePerTest
+# -rm ./servWork/*log 
+	-rm ./servWork/*socket*

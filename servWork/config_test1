@@ -1,0 +1,9 @@
+_n_worker = 1  
+
+_max_file = 10000
+
+_max_dim = 128     
+
+_socket_name = socket1
+
+_file_log_name = log

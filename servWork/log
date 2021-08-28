@@ -1252,3 +1252,6 @@ APERTURA SERVER Mon Aug 23 19:28:12 2021
   8 :  -4 :  0  close connection | res = 1 | ret dim = 4 |Mon Aug 23 19:29:00 2021
   7 :  -4 :  1   open connection | res = 1 | ret dim = 0 |Mon Aug 23 19:32:37 2021
   7 :   1 :  2         open file | res = 0 | created | test/di/file | ret dim = 4 |Mon Aug 23 19:32:42 2021
+
+APERTURA SERVER Sat Aug 28 19:24:36 2021
+ -4 :   0 : -4 : N file = 0 DIM tot = 0 | Sat Aug 28 19:27:07 2021

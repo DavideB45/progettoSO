@@ -7,12 +7,12 @@
 //  non e' consentito modificare i nomi
 //  ne il loro ordinamento
 
-_n_worker  === 0  
+_n_worker  === 4  
 
 
 
-_max_file:::= 100            
+_max_file:::= 10000            
 
 
-_max_dim :=       _socket_name= daddu
-_file_log_name =: 0
+_max_dim :=128      _socket_name= default_socket
+_file_log_name =: default_log

@@ -48,7 +48,7 @@ TreeFile* fileStorage;
 volatile __sig_atomic_t serverStatus;
 
 void readConfig(char* indirizzo);
-int initServer(void);
+int initServer(char* fileConfName);
 int createThreads(void);
 void collectThreads(void);
 
@@ -140,8 +140,11 @@ int main(int argc, char* argv[]){
 	pthread_sigmask(SIG_SETMASK, &newSet, &oldSet);
 	
 
-	// controlla di non aver lasciato nulla
-	if(initServer() != 0){
+	char* conf = NULL;
+	if(argc == 2){
+		conf = argv[1];
+	}
+	if(initServer(conf) != 0){
 		destroyTreeFile(fileStorage);
 		destroyClientTable(resourceTable);
 		destroyList(logQueue, destroyLogOp);
@@ -161,7 +164,6 @@ int main(int argc, char* argv[]){
 	}
 
 	sigaddset(&oldSet, SIGPIPE);
-	sigemptyset(&oldSet);
 	pthread_sigmask(SIG_SETMASK, &oldSet, NULL);
 	
 	dispatcher();
@@ -169,7 +171,7 @@ int main(int argc, char* argv[]){
 	collectThreads();
 }
 
-int initServer(void){
+int initServer(char* fileConfName){
 
 
 	fileStorage = newTreeFile();
@@ -182,9 +184,12 @@ int initServer(void){
 	
 
 	// leggere argv
-
-	readConfig("./servWork/file_config");
-
+	
+	if (fileConfName != NULL){
+		readConfig(fileConfName);
+	} else {
+		readConfig("./servWork/default_config");
+	}
 	// [1] per scrivere [0] per leggere
 	if(pipe(srvGen.doneReq) == -1){
 		perror("pipe");
@@ -471,8 +476,8 @@ void readConfig(char* indirizzo){
 	
 
 	
-	fileStorage->maxFileDim = 30;
-	fileStorage->maxFileNum = 10;
+	fileStorage->maxFileDim = 200*125000;
+	fileStorage->maxFileNum = 10000;
 	srvGen.n_worker    = 3;
 
 	FILE * filePtr = NULL;
@@ -513,6 +518,7 @@ void readConfig(char* indirizzo){
 			if(num > 0){
 				fileStorage->maxFileDim = num;
 			}
+			fileStorage->maxFileDim *= 125000;
 		}
 		
 		if(fscanf(filePtr, "%*[_socket_name]%*[ :=\t]%s\n", str) != 1){
