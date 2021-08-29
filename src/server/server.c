@@ -292,7 +292,7 @@ int setNewHand(void){
 
 	struct sigaction newSigHup;
 	memset( &newSigHup, 0, sizeof(newSigHup) );
-	newSigHup.sa_handler = sigIntQuit;
+	newSigHup.sa_handler = sigHup;
 	if(sigaction(SIGHUP, &newSigHup, NULL)){
 		perror("sigaction 1");
 		return -1;
@@ -348,8 +348,6 @@ void dispatcher(void){
 				maxFD = updatemax(set, maxFD);
 		}
 		rdSet = set;
-		// se qualcosa non funziona con le interruzioni provare pselect
-		
 		nReady = select(maxFD + 1, &rdSet, NULL, NULL, NULL);
 		if(nReady == -1){
 			/* SELECT ERROR */
@@ -712,7 +710,6 @@ void manageRequest(Request* req, int threadId){
 	LogOp* infoLog = NULL;
 	enum operResult result = NONE;
 	do{
-		printf("eseguo\n");
 		switch(GET_OP(req->oper)){
 		case CLOSE_CONNECTION:
 			/* non dovrebbe arrivare qui' */
@@ -916,7 +913,6 @@ void manageRequest(Request* req, int threadId){
 			printf("CLOSE_FILE\n");
 			if(req->sFileName == NULL){
 				nodePtr = getFileFromSocket(req, &result, threadId);
-				printf("nodo con il file%p\n", (void*) nodePtr);
 				fflush(stdout);
 				if(result == NONE){
 					if(nodePtr == NULL){
@@ -1027,7 +1023,6 @@ void manageRequest(Request* req, int threadId){
 	}
 	
 	
-	printf("%d sono in vacanza\n", threadId);
 	if(req != NULL && result != DELAYED){
 		destroyRequest(&req);
 	}
@@ -1053,7 +1048,6 @@ TreeNode* getFileFromSocket(Request* req, enum operResult* result, int threadId)
 		if( readFormSocket(req->client, req->sFileName, dim + 1) == 0){
 			/* tutto ok */
 			req->sFileName[dim] = '\0';
-			printf("%d : nome file = %s\n", threadId, req->sFileName);////////////////////////////////////
 			nodePtr = TreeFileFind(fileStorage, req->sFileName);
 			if(errno != 0){
 				sendClientError(req->client, UNKNOWN_ERROR);
@@ -1134,7 +1128,6 @@ int tryUse(TreeNode* nodePtr, Request* req, int closeOnFail){
 		}
 		return -1;
 	}
-	printf("controllo se posso eseguire\n");
 	if( nodePtr->sFile == NULL || nodePtr->sFile->flagUse || !fileUsePermitted(req->client, nodePtr->sFile) ){
 		if( generalListInsert(req, nodePtr->sFile->requestList) == 0){
 			/* operazione fallita (non ho messo in coda) */
@@ -1146,14 +1139,12 @@ int tryUse(TreeNode* nodePtr, Request* req, int closeOnFail){
 			}
 			return -1;
 		} else {
-			printf("richiesta in coda\n");//////////////////////////////////////////////////////////
 			/* richiesta messa in coda */
 			Pthread_mutex_unlock(&(nodePtr->lock));
 			return 0;
 		}
 	} else {
 		/* il thread inizia a gestire il file */
-		printf("inizio gestione file\n");/////////////////////////////////////////////////////////
 		nodePtr->sFile->flagUse = 1;
 		Pthread_mutex_unlock(&(nodePtr->lock));
 		return 1;
@@ -1280,13 +1271,15 @@ int openFileW(Request* req, TreeNode** nodePtrP){
 			free(client_);
 			return FAILED_CONT;
 		}
+	} else {
+		free(client_);
 	}
 	// chiedo la lock
 	if(GET_O_LOCK(req->oper)){
 		clientOpen(req->client, nodePtr, TRUE, resourceTable);
 		if( Pthread_mutex_lock( &(nodePtr->lock) ) != 0){
 			clientClose(req->client, nodePtr, TRUE, resourceTable);
-			generalListRemove(client_, nodePtr->sFile->openList);
+			generalListRemove(&(req->client), nodePtr->sFile->openList);
 			sendClientError(req->client, UNKNOWN_ERROR);
 			// free(client_);
 			return FAILED_CONT;
@@ -1325,7 +1318,7 @@ int readFileW(Request* req, TreeNode *nodePtr, int threadId){
 		sendClientError(req->client, FILE_NOT_OPEN);
 		return FAILED_CONT;
 	}
-	char* buffRet = malloc(sizeof(int) + nodePtr->sFile->dim);
+	char* buffRet = malloc(2*sizeof(int) + nodePtr->sFile->dim);
 	if(buffRet == NULL){
 		infoLog = newLogOp(READ_FILE, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
 		LOG_INSERT(infoLog);
@@ -1343,19 +1336,22 @@ int readFileW(Request* req, TreeNode *nodePtr, int threadId){
 	}
 	int res = SUCCESS;
 	memcpy(buffRet, &res, sizeof(int));
-	memcpy(buffRet + sizeof(int), nodePtr->sFile->data, nodePtr->sFile->dim);
+	memcpy(buffRet + sizeof(int), &(nodePtr->sFile->dim), sizeof(int));
+	memcpy(buffRet + 2*sizeof(int), nodePtr->sFile->data, nodePtr->sFile->dim);
 	
-	infoLog = newLogOp(READ_FILE, req->sFileName, req->client, threadId, 1, 0, sizeof(int) + nodePtr->sFile->dim);
+	infoLog = newLogOp(READ_FILE, req->sFileName, req->client, threadId, 1, 0, 2*sizeof(int) + nodePtr->sFile->dim);
 	LOG_INSERT(infoLog);
 	if(nodePtr->sFile->flagO_lock == 1){
 		if(Pthread_mutex_lock( &(nodePtr->lock) )){
 			nodePtr->sFile->flagUse = 0;
 			Pthread_mutex_unlock( &(nodePtr->lock) );
 		}
-		sendClientResult(req->client, buffRet, sizeof(int) + nodePtr->sFile->dim);
+		sendClientResult(req->client, buffRet, 2*sizeof(int) + nodePtr->sFile->dim);
+		free(buffRet);
 		return COMPLETED_STOP;
 	} else {
-		sendClientResult(req->client, buffRet, sizeof(int) + nodePtr->sFile->dim);
+		sendClientResult(req->client, buffRet, 2*sizeof(int) + nodePtr->sFile->dim);
+		free(buffRet);
 		return COMPLETED_CONT;
 	}
 }
@@ -1364,7 +1360,7 @@ int readNFilesW(Request* req, int threadId){
 	// ritorna traslato di 24
 	LogOp* infoLog;
 	char* buff = NULL;
-	int nFile = (req->oper);
+	int nFile = GET_N_FILE(req->oper);
 	int dim = 0;
 	buff = getNElement(&dim, fileStorage, &nFile);
 	if(buff == NULL){
@@ -1456,7 +1452,6 @@ int appendToFileW(Request* req, TreeNode* nodePtr, int threadId, int logOpKind){
 		LOG_INSERT(logInfo);
 		return FAILED_CONT;
 	}
-	printf("ho letto %d lettere :\n", size);
 	if(!isInGeneralList(&(req->client), nodePtr->sFile->openList)){
 		sendClientError(req->client, FILE_NOT_OPEN << 24);
 		logInfo = newLogOp(logOpKind, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
@@ -1498,8 +1493,6 @@ int appendToFileW(Request* req, TreeNode* nodePtr, int threadId, int logOpKind){
 		return FAILED_CONT;
 	}
 	memcpy(toretVict, &numVic, sizeof(int));
-	printf("Controllo se devo fare spazio\n");
-	sleep(1);
 	if(fileStorage->filedim + size > fileStorage->maxFileDim){
 		int missingSpace = fileStorage->filedim + size - fileStorage->maxFileDim;
 		int dataDimFreed = 0;

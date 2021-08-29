@@ -31,14 +31,19 @@ clienttest.out : $(CLIENT2OBJ)
 	$(CC) $(CFLAGS) $< -c 
 
 test1 : 
+	chmod +x creafileA.sh
 	./creafileA.sh
-	valgrind --leak-check=full ./bin/server.out &
-	
+	valgrind --leak-check=full ./bin/server.out ./servWork/config_test1 > serverOut &
+# -flush&>> servPrint &
+	chmod +x clientTest1.sh
+	./clientTest1.sh
 
 clean : 
 	-rm ./obj/*.o *.out
 	-rm ./bin/* 
 	-rm -r ./fileXtestLRU
 	-rm -r ./filePerTest
-# -rm ./servWork/*log 
+	-rm ./servWork/*log 
 	-rm ./servWork/*socket*
+	-rm -r ./resTest
+	-rm -r ./downloaded

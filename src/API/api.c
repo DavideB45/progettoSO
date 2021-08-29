@@ -468,7 +468,6 @@ int readNFiles(int N, const char* dirname){
 		default:
 			if((result >> 24) == SUCCESS){
 				int nFile = result & 0x00ffffff;
-				printf("file letti %d\n", nFile);
 				saveExFile(_sock, dirname, nFile);
 				if(errno != 0){
 					return -1;
@@ -705,7 +704,8 @@ int readFile(const char* pathname, void** buff, size_t* size){
 		setErrno(result);
 		return -1;
 	}
-	if(readns(_sock, &size, sizeof(int)) != 0){
+	*size = 0;
+	if(readns(_sock, size, sizeof(int)) != 0){
 		return -1;
 	}
 	*buff = malloc((*size)*sizeof(char));

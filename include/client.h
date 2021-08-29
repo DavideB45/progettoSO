@@ -28,6 +28,7 @@
 #define MAXPRINT 300
 
 #define IF_PRINT(flag, print)	if(flag){\
+									fflush(stdout);\
 									print;\
 								}
 

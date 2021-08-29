@@ -6,4 +6,4 @@ _max_dim = 128
 
 _socket_name = socket1
 
-_file_log_name = log
+_file_log_name = test1log

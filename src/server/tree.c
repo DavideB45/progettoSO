@@ -288,13 +288,11 @@ TreeNode* TreeFileFind(TreeFile* tree, char* name){
 		errno = 0;
 		return NULL;
 	}
-	printf("prendo la lock\n");
 	if(Pthread_mutex_lock( &(node->lock) ) != 0){
 		endMutexTreeFile(tree);
 		errno = EPERM;
 		return NULL;
 	}
-	printf("ho la lock\n");
 	fflush(stdout);
 	if(node->sFile == NULL){
 		Pthread_mutex_unlock( &(node->lock) );
@@ -477,45 +475,31 @@ int removeFromLRU(TreeFile* tree, TreeNode* node){
 	// No perche' FILE_DELETED e' usato solo quando 
 	// ho la mutua esclusione sul file
 	(tree->filedim) -= node->sFile->dim;
-	printf("non sei ancora crashato 1\n");
-	fflush(stdout);
 	if(tree->mostRecentLRU == node){
 		/* era la testa */
 		tree->mostRecentLRU = node->lessRecentLRU;
-		printf("non sei ancora crashato 2\n");
-		fflush(stdout);
 		if(node->lessRecentLRU == NULL){
 			/* era l'unico */
 			tree->leastRecentLRU = NULL;
 		} else {
 			/* sistemo nuovo MRU */
-			printf("non sei ancora crashato 3\n");
-			fflush(stdout);
 			tree->mostRecentLRU->moreRecentLRU = NULL;
 		}
-		printf("non sei ancora crashato 4\n");
-		fflush(stdout);
 		node->lessRecentLRU = NULL;
 		node->moreRecentLRU = NULL;
 		errno = 0;
 		return 0;
 	}
 	
-	printf("non sei ancora crashato 5\n");
-	fflush(stdout);
 	if(tree->leastRecentLRU == node){
 		/* era l'ultimo (almeno uno davanti) */
 		tree->leastRecentLRU = node->moreRecentLRU;
-		printf("non sei ancora crashato 6\n");
-		fflush(stdout);
 		tree->leastRecentLRU->lessRecentLRU = NULL;
 		node->lessRecentLRU = NULL;
 		node->moreRecentLRU = NULL;
 		errno = 0;
 		return 0;
 	}
-	printf("non sei ancora crashato 7\n");
-	fflush(stdout);
 	if(node->lessRecentLRU != NULL){
 		node->lessRecentLRU->moreRecentLRU = node->moreRecentLRU;
 	}

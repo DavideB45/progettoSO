@@ -11,6 +11,8 @@
 #include <string.h>
 #include <time.h>
 
+struct timespec delay;// ogni quanto mandare richieste
+
 int dirWrite(char* srcDir, char* endDir, int printflag);
 int multipleWrite(char* files, char* dirname, int printflag);
 
@@ -29,7 +31,7 @@ int main(int argc, char* argv[]){
 	int opt;
     char* ends;
 	char *optargDup;
-	struct timespec delay;
+	
 	delay.tv_sec = 0;
 	delay.tv_nsec = 0;
 
@@ -87,7 +89,6 @@ int main(int argc, char* argv[]){
 		// break;
 		case 'r':
 			optargDup = optarg;
-			// mettere degli if
 			if(optind < argc){
 				if(argv[optind][0] == '-' && argv[optind][1] == 'd'){
 					opt = getopt(argc, argv, "d:");
@@ -150,7 +151,6 @@ int main(int argc, char* argv[]){
 		case ':':
 		break;
         }
-		nanosleep(&delay, NULL);
     }
 	if(sockName != NULL){
 		closeConnection(sockName);
@@ -186,14 +186,21 @@ void recWatchDir(char* dir, char* endDir,long int* nFile, int printflag){
 				cwd[cwdDim] = '/';
 				memcpy(cwd + cwdDim + 1, dir_info->d_name, strlen(dir_info->d_name) + 1);
 				if(openFile(cwd, O_CREATE | O_LOCK) == 0){
+					nanosleep(&delay, NULL);
+					
 					(*nFile)--;
 					IF_PRINT(printflag, printf("scrivo %s\n", cwd));
 					if(writeFile(cwd, endDir) == 0){
+						nanosleep(&delay, NULL);
+						
 						IF_PRINT(printflag, puts("success"));
 						closeFile(cwd);
+						nanosleep(&delay, NULL);
+
 					} else {
 						IF_PRINT(printflag, perror("write File"));
 						closeFile(cwd);
+						nanosleep(&delay, NULL);
 					}
 				} else {
 					IF_PRINT(printflag, perror("create file"));
@@ -232,11 +239,16 @@ int multipleWrite(char* files, char* dirname, int printflag){
 	while( fileName != NULL){
 		IF_PRINT(printflag, printf("write file %s\n", fileName));
 		if(openFile(fileName, O_CREATE | O_LOCK) == 0){
+			nanosleep(&delay, NULL);
+
 			if(writeFile(fileName, dirname) == 0){
 				numSucc++;
 			}
+			nanosleep(&delay, NULL);
+
 			IF_PRINT(printflag, perror("write File"));
 			closeFile(fileName);
+			nanosleep(&delay, NULL);
 		}
 		fileName = strtok(NULL, ",");
 	}
@@ -269,6 +281,8 @@ int multipleRead(char* files, char* saveDir, int printflag){
 		if(getcwd(cwd, MAXDIRDIM) == NULL){
 			return 0;
 		}
+		createParentDir(saveDir);
+		mkdir(saveDir, 0777);
 		if(chdir(saveDir) != 0){
 			return 0;
 		}
@@ -277,7 +291,11 @@ int multipleRead(char* files, char* saveDir, int printflag){
 	while( fileName != NULL){
 		IF_PRINT(printflag, printf("read file %s\n", fileName));
 		if(openFile(fileName, 0) == 0){
+			nanosleep(&delay, NULL);
+
 			if(readFile(fileName,(void**) &buff, &size) == 0){
+				nanosleep(&delay, NULL);
+
 				numSucc++;
 				IF_PRINT(printflag, printf("read byte %ld\n", size));
 				if(printflag && size < MAXPRINT){
@@ -319,7 +337,10 @@ int multipleRandomRead(char* N, char* saveDir, int printflag){
 			readNum = -1;
 		}
 	}
+	IF_PRINT(printflag,printf("file richiesti %d\n", readNum));
 	readNum = readNFiles(readNum, saveDir);
+	nanosleep(&delay, NULL);
+
 	if(readNum >= 0 && printflag){
 		printf("letti %d file\n", readNum);
 	} else {
@@ -337,6 +358,7 @@ int multipleLock(char* files, int printflag){
 		if(openFile(fileName, O_LOCK) == 0){
 			numSucc++;
 		}
+		nanosleep(&delay, NULL);
 		IF_PRINT(printflag, perror("lock File"));
 		fileName = strtok(NULL, ",");
 	}
@@ -351,8 +373,11 @@ int multipleUnLock(char* files, int printflag){
 		if(unlockFile(fileName) == 0){
 			numSucc++;
 		}
+		nanosleep(&delay, NULL);
+
 		IF_PRINT(printflag, perror("unlock File"));
 		closeFile(fileName);
+		nanosleep(&delay, NULL);
 		fileName = strtok(NULL, ",");
 	}
 	return numSucc;
@@ -367,6 +392,7 @@ int multipleCancel(char* files, int printflag){
 		if(removeFile(fileName) == 0){
 			numSucc++;
 		}
+		nanosleep(&delay, NULL);
 		IF_PRINT(printflag, perror("cancel File"));
 		fileName = strtok(NULL, ",");
 	}
