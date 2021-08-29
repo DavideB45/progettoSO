@@ -1,0 +1,9 @@
+_n_worker: 4
+
+_max_file: 10
+
+_max_dim: 1 Mb
+
+_socket_name: socket2
+
+_file_log_name: test2log

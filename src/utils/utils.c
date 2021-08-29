@@ -15,7 +15,7 @@ int intCompare(const void* A,const void* B){
 	return *((int*) A) - *((int*) B);
 }
 
-char* duplicateString(char* toDup){
+char* duplicateString(const char* toDup){
 	int len = strlen(toDup) + 1;
 	char* toRet = malloc(len*sizeof(char));
 	if(toRet == NULL){

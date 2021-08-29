@@ -29,7 +29,7 @@ int readn(long fd, void *buf, size_t size);
 int writen(long fd, void *buf, size_t size);
 
 // ritorna una copia della stringa toDup
-char* duplicateString(char* toDup);
+char* duplicateString(const char* toDup);
 
 int intCompare(const void* A,const void* B);
 

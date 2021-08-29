@@ -141,6 +141,11 @@ static void saveExFile(int fd,const char* dirname, int num){
 	
 	if(chdir(dirname) != 0){
 		if(errno == ENOENT){
+			char* dupname = duplicateString(dirname);
+			if(dupname != NULL){
+				createParentDir(dupname);
+				free(dupname);
+			}
 			if(mkdir(dirname, 0777) != 0){
 				int err = errno;
 				close(currDir);
@@ -169,7 +174,7 @@ static void saveExFile(int fd,const char* dirname, int num){
 			errno = err;
 			return;
 		}
-		printf("nameLen = %d\n", nameLen);
+		IF_PRINT( printf("nameLen = %d\n", nameLen));
 		name = malloc(nameLen*sizeof(char) + 2);
 		if(name == NULL){
 			fchdir(currDir);

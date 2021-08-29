@@ -474,7 +474,7 @@ void readConfig(char* indirizzo){
 	
 
 	
-	fileStorage->maxFileDim = 200*125000;
+	fileStorage->maxFileDim = 200*1000000;
 	fileStorage->maxFileNum = 10000;
 	srvGen.n_worker    = 3;
 
@@ -516,7 +516,7 @@ void readConfig(char* indirizzo){
 			if(num > 0){
 				fileStorage->maxFileDim = num;
 			}
-			fileStorage->maxFileDim *= 125000;
+			fileStorage->maxFileDim *= 1000000;
 		}
 		
 		if(fscanf(filePtr, "%*[_socket_name]%*[ :=\t]%s\n", str) != 1){
@@ -1515,7 +1515,6 @@ int appendToFileW(Request* req, TreeNode* nodePtr, int threadId, int logOpKind){
 		TreeNode* currVic = generalListPop(toRem);
 		ServerFile* filePtr = NULL;
 		int nameLen;
-		printf("checkpoint 1\n");
 		while(currVic != NULL){
 			numVic++;
 			dataDimFreed += currVic->sFile->dim;
@@ -1525,7 +1524,6 @@ int appendToFileW(Request* req, TreeNode* nodePtr, int threadId, int logOpKind){
 				dimVic += currVic->sFile->dim + 2*sizeof(int) + nameLen;
 				
 				newPointer = realloc(toretVict, dimVic);
-				printf("checkpoint 2\n");
 				if(newPointer == NULL){
 					free(toretVict);
 					generalListDestroy(toRem);
@@ -1548,24 +1546,15 @@ int appendToFileW(Request* req, TreeNode* nodePtr, int threadId, int logOpKind){
 				}
 				toretVict = newPointer;
 				// copio informazioni in una stringa
-				printf("checkpoint 2.1 %d\n", nameLen);
 				memcpy(toretVict + oldDim, &nameLen, sizeof(int));
 				oldDim += sizeof(int);
-				printf("checkpoint 2.2 %s\n", currVic->sFile->namePath);
 				memcpy(toretVict + oldDim, currVic->sFile->namePath, nameLen);
 				oldDim += nameLen;
-				printf("checkpoint 2.3 %d\n", currVic->sFile->dim);
 				memcpy(toretVict + oldDim, &currVic->sFile->dim, sizeof(int));
 				oldDim += sizeof(int);
-				printf("checkpoint 2.4 \n");
 				memcpy(toretVict + oldDim, currVic->sFile->data, currVic->sFile->dim);
-				printf("checkpoint 2.5\n");
-				for(size_t i = 0; i < dimVic; i++){
-					printf("%d %c\n", toretVict[i], toretVict[i]);
-				}
 				
 			}
-			printf("checkpoint 4\n");
 			// rimuovo il file 
 			if(Pthread_mutex_lock( &(currVic->lock) ) != 0){
 				free(toretVict);
@@ -1592,19 +1581,11 @@ int appendToFileW(Request* req, TreeNode* nodePtr, int threadId, int logOpKind){
 				currVic->sFile = NULL;
 			Pthread_mutex_unlock(&(currVic->lock));
 			clientFileDel(currVic, resourceTable, filePtr);
-			printf("checkpoint 5\n");
-			fflush(stdout);
 			informClientDelete(filePtr);
-			printf("checkpoint 6\n");
-			fflush(stdout);
 			destroyServerFile(filePtr);
-			printf("checkpoint 7\n");
-			fflush(stdout);
 			currVic = generalListPop(toRem);
 		}
 		generalListDestroy(toRem);
-		printf("checkpoint 8\n");
-		fflush(stdout);
 		if(GET_DIR_SAVE(req->oper)){
 			memcpy(toretVict + sizeof(char), &numVic + sizeof(char), 3*sizeof(char));
 		}
@@ -1674,12 +1655,6 @@ int appendToFileW(Request* req, TreeNode* nodePtr, int threadId, int logOpKind){
 	if(!GET_DIR_SAVE(req->oper)){
 		dimVic = sizeof(int);
 	}
-	printf("devo solo rispondere\n");
-	
-	
-	// for(size_t i = 0; i < dimVic; i++){
-	// 	printf("%d %c\n", toretVict[i], toretVict[i]);
-	// }
 	
 	logInfo = newLogOp(logOpKind, req->sFileName, req->client, threadId, 1, size, dimVic);
 	LOG_INSERT(logInfo);
@@ -1758,7 +1733,7 @@ int unlockFileW(Request* req, TreeNode* nodePtr, int threadId){
 	return COMPLETED_CONT;
 }
 
-// se ho la lock la tolgo e inizio a gestire
+// se ho la lock la tolgo e inizio a gestire il file
 int closeFileW(Request* req, TreeNode* nodePtr, int threadId){
 	LogOp* infoLog;
 	if(!isInGeneralList( &(req->client), nodePtr->sFile->openList )){

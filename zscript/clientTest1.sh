@@ -1,5 +1,7 @@
 #!/bin/bash
 
+rm -r resTest
+rm -r downloaded
 mkdir resTest
 mkdir downloaded
 SETT=(-t 200 -p -f ./servWork/socket1)

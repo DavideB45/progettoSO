@@ -4,6 +4,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <errno.h>
 
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -309,6 +310,7 @@ int multipleRead(char* files, char* saveDir, int printflag){
 					filePtr = fopen(fileName + 1, "a+");
 					if(filePtr != NULL){
 						if(size > 0){
+							errno = 0;
 							fwrite(buff, 1, size, filePtr);
 							IF_PRINT(printflag, perror("read File"));
 						}

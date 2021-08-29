@@ -16,7 +16,6 @@ tutto:
 all: $(TARGETS)
 	mv *.out ./bin
 	mv *.o ./obj
-#	rm -f *.o
 
 server.out : $(SERVEROBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
@@ -31,19 +30,28 @@ clienttest.out : $(CLIENT2OBJ)
 	$(CC) $(CFLAGS) $< -c 
 
 test1 : 
-	chmod +x creafileA.sh
-	./creafileA.sh
+	chmod +x ./zscript/creafileA.sh
+	./zscript/creafileA.sh
 	valgrind --leak-check=full ./bin/server.out ./servWork/config_test1 > serverOut &
 # -flush&>> servPrint &
-	chmod +x clientTest1.sh
-	./clientTest1.sh
+	chmod +x ./zscript/clientTest1.sh
+	./zscript/clientTest1.sh
+
+test2 :
+	chmod +x ./zscript/creafileB.sh
+	./zscript/creafileB.sh
+	./bin/server.out ./servWork/config_test2 > serverOut &
+	chmod +x ./zscript/clientTest2.sh
+	./zscript/clientTest2.sh
 
 clean : 
 	-rm ./obj/*.o *.out
 	-rm ./bin/* 
-	-rm -r ./fileXtestLRU
-	-rm -r ./filePerTest
+	-rm -r fileXtestLRU
+	-rm -r filePerTest
 	-rm ./servWork/*log 
 	-rm ./servWork/*socket*
-	-rm -r ./resTest
-	-rm -r ./downloaded
+	-rm -r resTest
+	-rm -r downloaded
+	-rm -r expelled
+	-rm serverOut
