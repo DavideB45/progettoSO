@@ -31,4 +31,4 @@ sleep 2
 
 sleep 1
 
-kill -HUP $(ps aux | grep server.out | tr -s " " | cut -d ' ' -f 2 | head -n 1)
+kill -HUP $(ps aux | grep -v grep | grep ./bin/server.out | tr -s " " | cut -d ' ' -f 2 | head -n 1)

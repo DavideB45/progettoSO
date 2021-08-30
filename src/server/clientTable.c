@@ -244,6 +244,8 @@ int disconnectClient(int clientId, ClientTable *tab){
 	// rimuovo la lock dai file su cui il client aveva la mutua esclusione
 	while(nodePtr = generalListPop(clientPtr->nodeLocked), nodePtr != NULL){
 		if( Pthread_mutex_lock( &((nodePtr)->lock) ) != 0){
+			Pthread_mutex_unlock( &(clientPtr->lock) );
+			Pthread_mutex_unlock( &(tab->lock) );
 			errno = EPERM;
 			return -1;
 		}
@@ -255,6 +257,8 @@ int disconnectClient(int clientId, ClientTable *tab){
 	// chiudo i file non chiusi
 	while(nodePtr = generalListPop(clientPtr->nodeInUse), nodePtr != NULL){
 		if( Pthread_mutex_lock( &((nodePtr)->lock) ) != 0){
+			Pthread_mutex_unlock( &(clientPtr->lock) );
+			Pthread_mutex_unlock( &(tab->lock) );
 			errno = EPERM;
 			return -1;
 		}

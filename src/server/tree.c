@@ -163,6 +163,7 @@ TreeNode* TreeFileinsert(TreeFile* tree , TreeNode** newNode, ServerFile** remov
 		toRet = generalListPop(toRemove);
 		generalListDestroy(toRemove);
 		if(Pthread_mutex_lock( &(toRet->lock) ) != 0){
+			endMutexTreeFile(tree);
 			errno = EPERM;
 			return NULL;
 		}
@@ -197,6 +198,7 @@ TreeNode* TreeFileinsert(TreeFile* tree , TreeNode** newNode, ServerFile** remov
 	} else {
 		if(errno == 0){
 			if(Pthread_mutex_lock( &(toRet->lock) ) != 0){
+				endMutexTreeFile(tree);
 				errno = EPERM;
 				return toRet;
 			}
@@ -216,6 +218,7 @@ TreeNode* TreeFileinsert(TreeFile* tree , TreeNode** newNode, ServerFile** remov
 			Pthread_mutex_unlock( &(toRet->lock) );
 			errno = EPERM;
 		}
+		endMutexTreeFile(tree);
 		return NULL;	
 	}
 }
@@ -293,7 +296,6 @@ TreeNode* TreeFileFind(TreeFile* tree, char* name){
 		errno = EPERM;
 		return NULL;
 	}
-	fflush(stdout);
 	if(node->sFile == NULL){
 		Pthread_mutex_unlock( &(node->lock) );
 		endMutexTreeFile(tree);
@@ -318,6 +320,7 @@ char* getNElement(int* dim, TreeFile* tree, int* N){
 	int numFile = 0;
 	char* allFile = calloc(1, sizeof(int));
 	if(allFile == NULL){
+		Pthread_mutex_unlock( &(tree->lock) );
 		return NULL;
 	}
 	
@@ -577,6 +580,7 @@ GeneralList* makeSpace(TreeFile* tree, int nFile, int dimSpace){
 				generalListInsert( (void*) currVictim, listVictim);
 				if(errno != 0){
 					err = errno;
+					Pthread_mutex_unlock( &(currVictim->lock) );
 					generalListDestroy(listVictim);
 					errno = err;
 					return NULL;

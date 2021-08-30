@@ -157,7 +157,7 @@ int main(int argc, char* argv[]){
 		closeConnection(sockName);
 	}
 	
-    printf("FINE\n");
+    IF_PRINT(printFalg, printf("FINE\n"));
     return 0;
 }
 

@@ -9,13 +9,16 @@ SERVEROBJS:= FifoList.o files.o server.o generalList.o request.o tree.o utils.o 
 ILCLIENTOBJ:= api.o utils.o ilClient.o
 CLIENT2OBJ:= api.o utils.o testClient.o
 
-tutto: 
-	mv ./obj/*.o ./
-	make all
 
 all: $(TARGETS)
 	mv *.out ./bin
 	mv *.o ./obj
+
+file:
+	chmod +x ./zscript/creafileA.sh
+	./zscript/creafileA.sh
+	chmod +x ./zscript/creafileB.sh
+	./zscript/creafileB.sh
 
 server.out : $(SERVEROBJS)
 	$(CC) $(CFLAGS) -o $@ $^ $(LIBS)
@@ -29,29 +32,30 @@ clienttest.out : $(CLIENT2OBJ)
 %.o : src/*/%.c
 	$(CC) $(CFLAGS) $< -c 
 
-test1 : 
-	chmod +x ./zscript/creafileA.sh
-	./zscript/creafileA.sh
+test1 :
 	valgrind --leak-check=full ./bin/server.out ./servWork/config_test1 > serverOut &
-# -flush&>> servPrint &
 	chmod +x ./zscript/clientTest1.sh
 	./zscript/clientTest1.sh
 
 test2 :
-	chmod +x ./zscript/creafileB.sh
-	./zscript/creafileB.sh
 	./bin/server.out ./servWork/config_test2 > serverOut &
 	chmod +x ./zscript/clientTest2.sh
 	./zscript/clientTest2.sh
 
+test3 :
+	./bin/server.out ./servWork/config_test3 > serverOut &
+	chmod +x ./zscript/clientTest3.sh
+	./zscript/clientTest3.sh
+
+cleanall : clean
+	-rm -r fileXtestLRU
+	-rm -r filePerTest
+
 clean : 
 	-rm ./obj/*.o *.out
 	-rm ./bin/* 
-	-rm -r fileXtestLRU
-	-rm -r filePerTest
 	-rm ./servWork/*log 
 	-rm ./servWork/*socket*
 	-rm -r resTest
-	-rm -r downloaded
 	-rm -r expelled
 	-rm serverOut

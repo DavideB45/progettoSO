@@ -1,0 +1,9 @@
+_n_worker 8  
+
+_max_file 100
+
+_max_dim 32 mb    
+
+_socket_name socket3
+
+_file_log_name test3log

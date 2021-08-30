@@ -79,7 +79,7 @@ int fileUsePermitted(int client, ServerFile* filePtr);
 // chiude la connessione con il client
 int closeConnectionW(int client);
 // apre un file (open = intero che definisce opzioni)
-int openFileW(Request* req, TreeNode** nodePtrP);
+int openFileW(Request* req, TreeNode** nodePtrP, int threadId);
 // scrive al client il contenuto del file
 int readFileW(Request* req, TreeNode *Ptr, int threadId);
 // scrive al client il contenuto di N files
@@ -98,7 +98,7 @@ int closeFileW(Request* req, TreeNode* nodePtr, int threadId);
 int removeFileW(Request* req, TreeNode* nodePtr, int threadId);
 
 // dopo la rimozione di un file pulisce la lista di richieste ancora in coda
-void informClientDelete(ServerFile* filePtr);
+void informClientDelete(ServerFile* filePtr, int threadId);
 
 
 //////////////////////////////////////////////////////////////
@@ -255,6 +255,7 @@ void collectThreads(void){
 	for(size_t i = 0; i < srvGen.n_worker; i++){
 		nullSended += insert(srvGen.toServe, NULL);
 	}
+	printf("aspetto i thread\n");
 	int* threadRet;
 	if(nullSended >= srvGen.n_worker){
 		for(int i = 0; i < srvGen.n_worker; i++){
@@ -263,6 +264,7 @@ void collectThreads(void){
 			free(srvGen.threadUse[i]);
 		}
 	}
+	printf("aspetto il log\n");
 	LogOp* endLog = newLogOp(0, NULL, SERVER, 0, 0, 0, 0);
 	if(insert(logQueue, endLog) == 0){
 		destroyLogOp(endLog);
@@ -402,7 +404,7 @@ void dispatcher(void){
 								srvGen.clientMax = srvGen.clientNum;
 							}
 							
-							newClient(newConn, resourceTable);///////////vedere se spostare e farlo fare al client
+							newClient(newConn, resourceTable);
 							if(maxFD < newConn)
 								maxFD = newConn;
 							FD_SET(newConn, &set);
@@ -693,7 +695,7 @@ printf("ciao, sono nato %d\n", threadId);
 			DISCONN_CLIENT(clId);
 		break;
 		default:;
-			printf("%d : richiesta da %d\n",threadId, clId);
+			printf("\n%d : richiesta da %d\n",threadId, clId);
 			Request* req = newRequest(oper, clId, NULL, 0, NULL);
 			manageRequest(req, threadId);
 		break;
@@ -715,6 +717,8 @@ void manageRequest(Request* req, int threadId){
 			/* non dovrebbe arrivare qui' */
 			DISCONN_CLIENT(req->client);
 			printf("CLOSE_CONNECTION\n");
+printf("completato\n");
+fflush(stdout);
 		break;
 		case OPEN_FILE:
 			printf("OPEN_FILE\n");
@@ -724,7 +728,7 @@ void manageRequest(Request* req, int threadId){
 				if(result == NONE){
 					if(nodePtr == NULL){
 						/* file non trovato forse lo creo*/
-						result = openFileW(req, &nodePtr);
+						result = openFileW(req, &nodePtr, threadId);
 					} else {
 						/* file trovato (eseguo la richiesta) */
 						// da sistemare per delayed
@@ -736,7 +740,7 @@ void manageRequest(Request* req, int threadId){
 							result = DELAYED;
 						break;
 						case 1:
-							result = openFileW(req, &nodePtr);
+							result = openFileW(req, &nodePtr, threadId);
 						break;
 						}
 					}
@@ -748,7 +752,7 @@ void manageRequest(Request* req, int threadId){
 					era stata gia' trovata da un altro client in precedenza
 					quindi e' stata rimossa dalla lista di richieste del file */
 			} else {
-				result = openFileW(req, &nodePtr);
+				result = openFileW(req, &nodePtr, threadId);
 			}
 			int flag = 0;
 			if(GET_O_CREATE(req->oper)){
@@ -771,6 +775,8 @@ void manageRequest(Request* req, int threadId){
 					}
 				}
 			}
+printf("completato\n");
+fflush(stdout);
 		break;
 		case READ_FILE:
 			printf("READ_FILE\n");
@@ -798,10 +804,14 @@ void manageRequest(Request* req, int threadId){
 			} else {
 				result = readFileW(req, nodePtr, threadId);
 			}
+printf("completato\n");
+fflush(stdout);
 		break;
 		case READ_N_FILES:
 			printf("READ_N_FILES\n");
 			readNFilesW(req, threadId);
+printf("completato\n");
+fflush(stdout);
 		break;
 		case WRITE_FILE:
 			printf("WRITE_FILE\n");
@@ -829,6 +839,8 @@ void manageRequest(Request* req, int threadId){
 			} else {
 				result = writeFileW(req, nodePtr, threadId);
 			}
+printf("completato\n");
+fflush(stdout);
 		break;
 		case APPEND_TO_FILE:
 			printf("APPEND_TO_FILE\n");
@@ -856,6 +868,8 @@ void manageRequest(Request* req, int threadId){
 			} else {
 				result = appendToFileW(req, nodePtr, threadId, APPEND_TO_FILE);
 			}
+printf("completato\n");
+fflush(stdout);
 		break;
 		case LOCK_FILE:
 			printf("LOCK_FILE\n");
@@ -882,6 +896,8 @@ void manageRequest(Request* req, int threadId){
 			} else {
 				result = lockFileW(req, nodePtr, threadId);
 			}
+printf("completato\n");
+fflush(stdout);
 		break;
 		case UNLOCK_FILE:
 			printf("UNLOCK_FILE\n");
@@ -908,12 +924,13 @@ void manageRequest(Request* req, int threadId){
 			} else {
 				result = unlockFileW(req, nodePtr, threadId);
 			}
+printf("completato\n");
+fflush(stdout);
 		break;
 		case CLOSE_FILE:
 			printf("CLOSE_FILE\n");
 			if(req->sFileName == NULL){
 				nodePtr = getFileFromSocket(req, &result, threadId);
-				fflush(stdout);
 				if(result == NONE){
 					if(nodePtr == NULL){
 						sendClientFatalError(req->client, NO_SUCH_FILE_F);
@@ -936,6 +953,8 @@ void manageRequest(Request* req, int threadId){
 			} else {
 				result = closeFileW(req, nodePtr, threadId);
 			}
+printf("completato\n");
+fflush(stdout);
 		break;
 		case REMOVE_FILE:
 			printf("REMOVE_FILE\n");
@@ -963,6 +982,8 @@ void manageRequest(Request* req, int threadId){
 			} else {
 				result = removeFileW(req, nodePtr, threadId);
 			}
+printf("completato\n");
+fflush(stdout);
 		break;
 		default:
 			printf("operazione sconosciuta ");
@@ -1017,10 +1038,10 @@ void manageRequest(Request* req, int threadId){
 		}
 	}
 	
-	if(result == FILE_DELETED){
-		/* mi occupo di informare gli altri client*/
-		removeFileW(req, nodePtr, threadId);
-	}
+	// if(result == FILE_DELETED){
+	// 	/* mi occupo di informare gli altri client*/
+	// 	removeFileW(req, nodePtr, threadId);
+	// }
 	
 	
 	if(req != NULL && result != DELAYED){
@@ -1048,6 +1069,8 @@ TreeNode* getFileFromSocket(Request* req, enum operResult* result, int threadId)
 		if( readFormSocket(req->client, req->sFileName, dim + 1) == 0){
 			/* tutto ok */
 			req->sFileName[dim] = '\0';
+			printf("file %s\n", req->sFileName);
+			fflush(stdout);
 			nodePtr = TreeFileFind(fileStorage, req->sFileName);
 			if(errno != 0){
 				sendClientError(req->client, UNKNOWN_ERROR);
@@ -1166,7 +1189,7 @@ int closeConnectionW(int client){
 }
 
 
-int openFileW(Request* req, TreeNode** nodePtrP){
+int openFileW(Request* req, TreeNode** nodePtrP, int threadId){
 	TreeNode* nodePtr = *nodePtrP;
 	LogOp* logInfo;
 	// esiste ma lo voglio creare
@@ -1209,10 +1232,10 @@ int openFileW(Request* req, TreeNode** nodePtrP){
 			int res = SUCCESS;
 			*nodePtrP = nodePtr;
 			if(toRemove != NULL && expelled != NULL){
-				logInfo = newLogOp(REMOVE_FILE, expelled->namePath, LRU_ALG, 0, 1, 0, 1);
+				logInfo = newLogOp(REMOVE_FILE, expelled->namePath, LRU_ALG, 0, 1, expelled->dim, 1);
 				LOG_INSERT(logInfo);
 				clientFileDel(toRemove, resourceTable, expelled);
-				informClientDelete(expelled);
+				informClientDelete(expelled, threadId);
 				destroyServerFile(expelled);
 			}
 			if(GET_O_LOCK(req->oper)){
@@ -1229,16 +1252,16 @@ int openFileW(Request* req, TreeNode** nodePtrP){
 			return COMPLETED_CONT;
 		break;
 		case ENOMEM:
-			sendClientError(req->client, NO_MEMORY_F);
+			sendClientError(req->client, NO_MEMORY);
 			destroyTreeNode(nodePtr);
 			return FAILED_STOP;
 		break;
 		case EPERM:
 			if(toRemove != NULL && expelled != NULL){
-				logInfo = newLogOp(REMOVE_FILE, expelled->namePath, LRU_ALG,0, 1, 0, 1);
+				logInfo = newLogOp(REMOVE_FILE, expelled->namePath, LRU_ALG,0, 1, expelled->dim, 1);
 				LOG_INSERT(logInfo);
 				clientFileDel(toRemove, resourceTable, expelled);
-				informClientDelete(expelled);
+				informClientDelete(expelled, threadId);
 				destroyServerFile(expelled);
 			}
 			sendClientError(req->client, UNKNOWN_ERROR);
@@ -1288,8 +1311,8 @@ int openFileW(Request* req, TreeNode** nodePtrP){
 		nodePtr->sFile->flagUse = 0;
 		nodePtr->sFile->lockOwner = req->client;
 		int reply = SUCCESS;
-		sendClientResult(req->client, &reply, sizeof(int));
 		Pthread_mutex_unlock( &(nodePtr->lock) );
+		sendClientResult(req->client, &reply, sizeof(int));
 		return COMPLETED_STOP;
 	}
 	
@@ -1500,8 +1523,7 @@ int appendToFileW(Request* req, TreeNode* nodePtr, int threadId, int logOpKind){
 		// controllare se devo ritornare il contenuto
 		printf("checkpoint 0 spazio richiesto %d\n", missingSpace);
 		if(toRem == NULL){
-			// int forCli = (NO_MEMORY << 24);
-			// printf("invio %d\n", forCli);
+			endMutexTreeFile(fileStorage);
 			sendClientError(req->client, (NO_MEMORY << 24));
 			logInfo = newLogOp(logOpKind, req->sFileName, req->client, threadId, 0, 0, sizeof(int));
 			LOG_INSERT(logInfo);
@@ -1581,7 +1603,7 @@ int appendToFileW(Request* req, TreeNode* nodePtr, int threadId, int logOpKind){
 				currVic->sFile = NULL;
 			Pthread_mutex_unlock(&(currVic->lock));
 			clientFileDel(currVic, resourceTable, filePtr);
-			informClientDelete(filePtr);
+			informClientDelete(filePtr, threadId);
 			destroyServerFile(filePtr);
 			currVic = generalListPop(toRem);
 		}
@@ -1592,7 +1614,7 @@ int appendToFileW(Request* req, TreeNode* nodePtr, int threadId, int logOpKind){
 		logInfo = newLogOp(0, NULL, LRU_ALG, threadId, 1, dataDimFreed, numVic);
 		LOG_INSERT(logInfo);
 	}
-	printf("spazio fatto");
+	printf("spazio fatto\n");
 	if(nodePtr->sFile->data == NULL){
 		// allocato nuovo
 		nodePtr->sFile->data = req->forEdit;
@@ -1784,7 +1806,7 @@ int removeFileW(Request* req, TreeNode* nodePtr, int threadId){
 	infoLog = newLogOp(REMOVE_FILE, req->sFileName, req->client, threadId, 1, -filePtr->dim, sizeof(int));
 	LOG_INSERT(infoLog);
 	clientFileDel(nodePtr, resourceTable, filePtr);
-	informClientDelete(filePtr);
+	informClientDelete(filePtr, threadId);
 	destroyServerFile(filePtr);
 	int res = SUCCESS;
 	sendClientResult(req->client, &res, sizeof(int));
@@ -1792,29 +1814,36 @@ int removeFileW(Request* req, TreeNode* nodePtr, int threadId){
 }
 
 // informare il log?
-void informClientDelete(ServerFile* filePtr){
+void informClientDelete(ServerFile* filePtr, int threadId){
 	int op, buffInt;
+	LogOp* infoLog;
 	Request* req = generalListPop(filePtr->requestList);
 	while(req != NULL){
 		op = GET_OP(req->oper);
 		// NOTA : sono presenti solo le operazioni che possono finire nella coda del file
 		if(op == REMOVE_FILE || op == CLOSE_FILE){
 			buffInt = SUCCESS;
+			infoLog = newLogOp(op, filePtr->namePath, req->client, threadId, 1, 0, sizeof(int));
+			LOG_INSERT(infoLog);
 			sendClientResult(req->client, &buffInt, sizeof(int));
 		} else {
 			if(op == OPEN_FILE || op == READ_FILE || op == LOCK_FILE || op == UNLOCK_FILE){
 			/* operazione fallita, non serve pulire il socket */
+			infoLog = newLogOp(op, filePtr->namePath, req->client, threadId, 0, 0, sizeof(int));
+			LOG_INSERT(infoLog);
 			sendClientError(req->client, NO_SUCH_FILE);
 			} else {
 				if(op == APPEND_TO_FILE){
+					infoLog = newLogOp(op, filePtr->namePath, req->client, threadId, 0, 0, sizeof(int));
+					LOG_INSERT(infoLog);
 					/* operazione fallita, devo pulire il socket */
 					if(readFormSocket(req->client, &(req->editDim), sizeof(int)) == 0){
 						req->forEdit = malloc(req->editDim + 1);
 						if(req->forEdit == NULL){
-							sendClientFatalError(req->client, NO_MEMORY_F);
+							sendClientFatalError(req->client, NO_MEMORY_F << 24);
 						} else {
 							if(readFormSocket(req->client, req->forEdit, req->editDim + 1) == 0){
-								sendClientError(req->client, NO_SUCH_FILE);
+								sendClientError(req->client, NO_SUCH_FILE << 24);
 							}
 						}
 					}
