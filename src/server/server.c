@@ -629,21 +629,22 @@ void* logThread(void* arg){
 				fprintf(filePtr, "file rem = %d freed mem = %d | ", FILE_REMOVED(toWrite), FREED_MEMORY(toWrite));
 			}
 		}
-		if(LRU_NEW_MAX(toWrite)){
-			switch(NEW_MAX_TIPE(toWrite)){
-			case MAXDIM:
-				fprintf(filePtr, "MAX dim = %d curr n file = %d | ", NEW_DIM(toWrite), NEW_FILE_N(toWrite));
-			break;
-			case MAXFILE:
-				fprintf(filePtr, "curr dim = %d MAX n file = %d | ", NEW_DIM(toWrite), NEW_FILE_N(toWrite));
-			break;
-			case MAXALL:
-				fprintf(filePtr, "MAX dim = %d MAX n file = %d | ", NEW_DIM(toWrite), NEW_FILE_N(toWrite));
-			break;
-			}
-		}
+		// if(LRU_NEW_MAX(toWrite)){
+		// 	switch(NEW_MAX_TIPE(toWrite)){
+		// 	case MAXDIM:
+		// 		fprintf(filePtr, "MAX dim = %d curr n file = %d | ", NEW_DIM(toWrite), NEW_FILE_N(toWrite));
+		// 	break;
+		// 	case MAXFILE:
+		// 		fprintf(filePtr, "curr dim = %d MAX n file = %d | ", NEW_DIM(toWrite), NEW_FILE_N(toWrite));
+		// 	break;
+		// 	case MAXALL:
+		// 		fprintf(filePtr, "MAX dim = %d MAX n file = %d | ", NEW_DIM(toWrite), NEW_FILE_N(toWrite));
+		// 	break;
+		// 	}
+		// }
 		if(SERV_CLOSE(toWrite)){
 			fprintf(filePtr, "%d : N file = %d DIM tot = %d | ",toWrite->client, fileStorage->fileCount, fileStorage->filedim);
+			fprintf(filePtr, "MAX file = %d MAX dim = %d | ", fileStorage->maxUsedFile, fileStorage->maxUsedSpace);
 		}
 		
 		

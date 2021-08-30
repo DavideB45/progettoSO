@@ -40,6 +40,7 @@ ClientTable* newClientTable(){
 		errno = EPERM;
 		return NULL;
 	}
+	printf("lock TABELLA = %p\n",(void*) &new->lock);
 	for(size_t i = 0; i < BASEDIM; i++){
 		new->arr[i] = NULL;
 	}

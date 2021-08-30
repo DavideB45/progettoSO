@@ -26,7 +26,7 @@ function randomdir(){
 function randomreq(){
 	randomfile
 	randomdir
-	OPwD=(-w ${RDIR[0]} -D "$PWD/expelled" -l ${RDIR[0]}/${FILEN[($RANDOM % 6)]} -r "${RDIR[0]}/${FILEN[($RANDOM % 6)]}" -d "$PWD/expelled")
+	OPwD=(-w ${RDIR[0]} -D "$PWD/expelled" -r "${RDIR[0]}/${FILEN[($RANDOM % 6)]}" -d "$PWD/expelled" -l ${RDIR[0]}/${FILEN[($RANDOM % 6)]})
 	OPw2=(-w ${RDIR[1]} -r "${RDIR[1]}/b/a/file1" -d "$PWD/expelled" -l "${RDIR[1]}/e/e/file5" -c "${RDIR[1]}/e/e/file5")
 	OPW1=(-W ${RFILE[0]} -r "${RFILE[0]}" -d "$PWD/expelled")
 	OPW2=(-W "${RFILE[0]},${RFILE[1]},${RFILE[3]}" -l ${RFILE[0]} -c ${RFILE[0]})
@@ -61,11 +61,11 @@ RREQUEST=(array)
 SECONDS=0
 while (($SECONDS <= 30))
 do
-	if (( $(ps aux | grep ilClient.out | wc -l) < 15))
+	if (( $(ps aux | grep ilClient.out | wc -l) < 17))
 	then
-		for ((i=0;i<15;i++)) do
+		for ((i=0;i<25;i++)) do
 			randomreq
-			./bin/ilClient.out -p -f ./servWork/socket3 ${RREQUEST[@]} &
+			./bin/ilClient.out -f ./servWork/socket3 ${RREQUEST[@]} &
 		done
 	fi
 done

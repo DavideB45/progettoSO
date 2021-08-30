@@ -98,6 +98,8 @@ int Pthread_mutex_init(pthread_mutex_t *mutex){
 
 /*retun 0 on success else -1*/
 int Pthread_mutex_lock(pthread_mutex_t *mutex){
+	// printf("mutex lock%p\n", (void*) mutex);
+	// fflush(stdout);
 	if(mutex == NULL){
 		return -1;
 	}
@@ -128,6 +130,8 @@ int Pthread_mutex_lock(pthread_mutex_t *mutex){
 
 /*retun 0 on success else -1*/
 int Pthread_mutex_unlock(pthread_mutex_t *mutex){
+	// printf("mutex unlock%p\n", (void*) mutex);
+	// fflush(stdout);
 	if(mutex == NULL){
 		return -1;
 	}

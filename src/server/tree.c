@@ -30,7 +30,7 @@ TreeFile* newTreeFile(){
 		free(newTree);
 		return NULL;
 	}
-	
+	printf("lock albero = %p\n", (void*) &newTree->lock);
 	newTree->maxUsedFile = 0;
 	newTree->maxUsedSpace = 0;
 
@@ -356,8 +356,8 @@ char* getNElement(int* dim, TreeFile* tree, int* N){
 					memcpy(allFile + allFileDim, currPtr->sFile->data, currPtr->sFile->dim);
 					allFileDim += currPtr->sFile->dim;
 				}
-				Pthread_mutex_unlock( &(currPtr->lock) );
 			}
+			Pthread_mutex_unlock( &(currPtr->lock) );
 		}
 		currPtr = currPtr->moreRecentLRU;
 	}
