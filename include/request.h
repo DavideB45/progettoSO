@@ -65,10 +65,6 @@ enum servErrorRet {
 // dice se salvare il path completo
 #define GET_COMP_PATH(x) ((x & (1 << 23)) == (1 << 23))
 
-// setta l'operazione come non bloccante
-#define SET_O_NON_BLOCK(x) x = x | (1 << 22)
-// dice se l'operazione va eseguita in modo bloccante
-#define GET_O_NON_BLOCK(x) ((x & (1 << 22)) == (1 << 22))
 
 // scrive la dimensione del nome del file 
 // non conta lo "\\0"

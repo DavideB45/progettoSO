@@ -183,7 +183,6 @@ void recWatchDir(char* dir, char* endDir,long int* nFile, int printflag){
 			if(dir_info->d_type == DT_DIR){
 				recWatchDir(dir_info->d_name, endDir, nFile, printflag);
 			} else {
-				// mettere path completo
 				cwd[cwdDim] = '/';
 				memcpy(cwd + cwdDim + 1, dir_info->d_name, strlen(dir_info->d_name) + 1);
 				if(openFile(cwd, O_CREATE | O_LOCK) == 0){

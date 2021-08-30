@@ -142,8 +142,7 @@ int Pthread_mutex_unlock(pthread_mutex_t *mutex){
 	if(ret == EINVAL){
 		if( Pthread_mutex_init(mutex) != 0){
 			return -1;
-		}
-		// ret = pthread_mutex_unlock(mutex);	
+		}	
 	}
 	
 	if(ret == 0){

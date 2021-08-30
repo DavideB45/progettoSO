@@ -47,7 +47,7 @@ typedef struct ServerInfo{
 	int doneReq[2];// pipe per informare dispatcher
 	FifoList* toServe;// richieste dei client
 	int n_worker;// totale thread worker
-	ThreadInfo* *threadUse;// array che dice cosa fanno i thread
+	ThreadInfo* *threadUse;// array dei thread
 	pthread_t threadLog;// gestore del file di log
 	int clientNum;// numero di client connessi
 	int clientMax;// massimo numero di client raggiunto

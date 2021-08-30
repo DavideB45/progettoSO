@@ -100,13 +100,6 @@ void destroyTreeNode(TreeNode* node);
 ///////////////////////////////// REPLACE ///////////////////////////////////////
 
 
-/* 
-	idee per estire la mutua esclusione
-	..x passare un _Bool per dire se deve eseguire la lock
-	..v creare funzioni particolari noMutex*LRU(TreeFile* tree, TreeNode* node)
-	..x vedere se lock ritorna errori utili
-*/
-
 // sposta un file/nodo in testa alla lista LRU
 // 0 success -1 err
 int moveToFrontLRU(TreeFile* tree, TreeNode* node);

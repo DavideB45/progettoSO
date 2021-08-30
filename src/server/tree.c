@@ -3,15 +3,11 @@
 #include <string.h>
 #include <errno.h>
 
-// #include "../../include/files.h"
-// #include "../../include/tree.h"
+
 #include <files.h>
 #include <tree.h>
 #include <utils.h>
 #include <pthread.h>
-
-//miltiple reader
-//le modifiche dei nodi vanno fatte in mutua escluione
 
 
 
@@ -425,9 +421,6 @@ void destroyTreeNode(TreeNode* node){
 /////////////////////////////////// LRU /////////////////////////////////////////
 ///////////////////////////////// REPLACE ///////////////////////////////////////
 
-// deve aggiornare max dim e max n file
-
-// controllare che non si abbiano puntatori a file NULL
 
 // funzioni da chiamare dentro la mutua esclusione
 
@@ -475,7 +468,6 @@ int removeFromLRU(TreeFile* tree, TreeNode* node){
 	// aggiorna spazio
 	(tree->fileCount) -= 1;
 	// nessuno puo' scrivere mentre faccio la remove
-	// No perche' FILE_DELETED e' usato solo quando 
 	// ho la mutua esclusione sul file
 	(tree->filedim) -= node->sFile->dim;
 	if(tree->mostRecentLRU == node){
@@ -557,7 +549,6 @@ void fakeFree(void* ptr){
 
 // cerca di liberare dimSpace byte di memoria e nFile
 // ritorna una lista di nodi contenti i file da rimuovere
-// modificare con le nuove politiche delle lock
 GeneralList* makeSpace(TreeFile* tree, int nFile, int dimSpace){
 	if(tree == NULL || nFile < 0 || dimSpace < 0){
 		errno = EINVAL;
@@ -598,10 +589,6 @@ GeneralList* makeSpace(TreeFile* tree, int nFile, int dimSpace){
 		return NULL;
 	}
 	
-	// se qualcuno ricercasse uno di questi elem lo risposterebbe in cima alla LRU
-	// ..v rimuovo dopo da LRU
-	// ..x sposto moveToFrontLRU
-	// ..x metto un bit flagReal
 	errno = 0;
 	return listVictim;
 }

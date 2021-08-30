@@ -40,7 +40,6 @@ ClientTable* newClientTable(){
 		errno = EPERM;
 		return NULL;
 	}
-	printf("lock TABELLA = %p\n",(void*) &new->lock);
 	for(size_t i = 0; i < BASEDIM; i++){
 		new->arr[i] = NULL;
 	}
@@ -95,7 +94,6 @@ ClientInfo* clientGet(int clientId, ClientTable *tab){
 }
 
 // attiva un posto in cui saranno tenute informazioni sul client
-// se fallisce chiudo il client
 // return -1 fail 0 success setta errno
 int newClient(int clientId, ClientTable *tab){
 	if(Pthread_mutex_lock( &(tab->lock ) ) != 0){
@@ -275,7 +273,7 @@ int disconnectClient(int clientId, ClientTable *tab){
 }
 
 // toglie file dalla lista close di clientId
-// se non ottengono la mutua esclusione termino / chiudo client e rifaccio struct
+// se non ottengono la mutua esclusione ignoro
 // return -1 fail 0 success setta errno
 int clientClose(int clientId, TreeNode* nodePtr, int O_Lock, ClientTable* tab){
 	ClientInfo* clientPtr = clientGet(clientId, tab);
@@ -298,7 +296,7 @@ int clientClose(int clientId, TreeNode* nodePtr, int O_Lock, ClientTable* tab){
 }
 
 // toglie file da lista lock
-// se non ottengono mutua esclusione termino / chiudo client e rifaccio struct
+// se non ottengono mutua esclusione ignoro
 // return -1 fail 0 success setta errno
 int clientUnlock(int clientId, TreeNode* nodePtr, ClientTable* tab){
 	ClientInfo* clientPtr = clientGet(clientId, tab);
@@ -318,7 +316,6 @@ int clientUnlock(int clientId, TreeNode* nodePtr, ClientTable* tab){
 }
 
 // dopo la rimozione di un file viene chiuso a tutti per evitare segFault
-// se fallisce devo terminare il server
 // da chiamare come ultima funzione di rimozione qunado nessuno ha puntatori a questo file
 // return -1 fail 0 success setta errno
 int clientFileDel(TreeNode* nodePtr, ClientTable* tab, ServerFile* filePtr){
@@ -327,7 +324,6 @@ int clientFileDel(TreeNode* nodePtr, ClientTable* tab, ServerFile* filePtr){
 		errno = EPERM;
 		return -1;
 	}
-	// non chiamo lock su file (chiamata da chi vuolerimuovere il file)
 	int* clientId = NULL;
 	ClientInfo* clientPtr;
 	while(clientId = generalListPop( filePtr->openList ), clientId != NULL){

@@ -12,8 +12,6 @@
 typedef struct _clientInfo{
 	pthread_mutex_t lock;
 	int id;
-	// 
-	// prima di destroyFlie() nessuno lo puo' avere aperto
 	GeneralList* nodeInUse;
 	GeneralList* nodeLocked;
 	struct _clientInfo* next;
@@ -32,35 +30,37 @@ ClientTable* newClientTable();
 void destroyClientTable(ClientTable* tab);
 
 // attiva un posto in cui saranno tenute informazioni sul client
-// se fallisce chiudo il client
 // return -1 fail 0 success
 int newClient(int clientId, ClientTable *tab);
 
 // mette file nella lista Open
 // se non ottengo mutua esclusione non lo metto
+// ritorna -1 errore 0 successo
 int clientOpen(int clientId, TreeNode* nodePtr, int O_Lock, ClientTable* tab);
 
 // mette file nella lista lock
 // se non ottengo mutua esclusione non lo metto
+// return -1 fail 0 success setta errno
 int clientLock(int clientId, TreeNode* nodePtr, ClientTable* tab);
 
-
-
-// chiude tutto quello che aveva aperto
+// chiude tutto quello che aveva aperto (da chiamare alla disconnessione)
 // se non ottengo mutua esclusione lascio tutto aperto per chi verra' dopo
+// return -1 fail 0 success setta errno
 int disconnectClient(int clientId, ClientTable *tab);
 
-// toglie file dalla lista close
-// se non ottengono la mutua esclusione lo lasciano aperto
-// rischio segFault distruggo la struct client o termino
+// toglie file dalla lista close di clientId
+// se non ottengono la mutua esclusione ignoro
+// return -1 fail 0 success setta errno
 int clientClose(int clientId, TreeNode* nodePtr, int O_Lock, ClientTable* tab);
 
 // toglie file da lista lock
-// se non ottengono mutua esclusione 
-// rischio segFault chiudo client (il prossimo avra' qualche file gia' locked)
+// se non ottengono mutua esclusione ignoro
+// return -1 fail 0 success setta errno
 int clientUnlock(int clientId, TreeNode* nodePtr, ClientTable* tab);
 
 // dopo la rimozione di un file viene chiuso a tutti per evitare segFault
+// da chiamare come ultima funzione di rimozione qunado nessuno ha puntatori a questo file
+// return -1 fail 0 success setta errno
 int clientFileDel( TreeNode* nodePtr, ClientTable* tab, ServerFile* filePtr);
 
 // restituisce il posto nell'array in cui sta il client

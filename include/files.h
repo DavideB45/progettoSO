@@ -11,10 +11,10 @@
 typedef struct ServerFile{
 	_Bool flagUse;// un thread lo sta gestendo
 	_Bool flagO_lock;
-	int lockOwner;// cliend ID = Inode del coso per prlarci
+	int lockOwner;// cliend ID
 	GeneralList* openList;// client che hanno aperto
 	GeneralList* requestList;// riempita da atri thread
-	int dim;//capire quale deve essere l'unita' di misura e se devo contare i metadati
+	int dim;
 	char* data;
 	char* namePath;
 	int creator;

@@ -190,7 +190,7 @@ static void saveExFile(int fd,const char* dirname, int num){
 			errno = err;
 			return;
 		}
-		
+		IF_PRINT( printf("name = %s\n", name + 2));
 		
 		if(readns(fd, &dataLen, sizeof(int)) != 0){
 			int err = errno;
@@ -226,7 +226,6 @@ static void saveExFile(int fd,const char* dirname, int num){
 		
 		
 		
-		// faccio le cos
 		name[0] = '.';
 		name[1] = '/';
 		createParentDir(name);
@@ -329,7 +328,6 @@ int closeConnection(const char* sockname){
 	return -1;
 }
 
-// non gestisce le espulsioni
 int openFile(const char* pathname, int flags){
 	if(pathname == NULL){
 		errno = EINVAL;
@@ -515,7 +513,6 @@ int writeFile(const char* pathname, const char* dirname){
 			errno = err;
 		return -1;
 		case 0:
-			printf("hai letto EOF\n");
 			err = errno;
 			close(fileFd);
 			free(fileDup);
@@ -633,6 +630,7 @@ int appendToFile(const char* pathname, void* buff, size_t size, const char* dirn
 			errno = ESRCH;
 			return -1;
 		case 1:
+			IF_PRINT( printf("byte upload = %ld\n", size) );
 			free(req);
 		break;
 	}

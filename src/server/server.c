@@ -5,7 +5,7 @@
 #include <time.h>
 #include <signal.h>
 
-// selfmade
+// creati
 #include <utils.h>
 #include <server.h>
 #include <FifoList.h>
@@ -14,7 +14,7 @@
 #include <clientTable.h>
 #include <logFun.h>
 
-// connection
+// connessioni
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/un.h>
@@ -47,33 +47,38 @@ FifoList* logQueue;
 TreeFile* fileStorage;
 volatile __sig_atomic_t serverStatus;
 
+// funzioni di avvio
 void readConfig(char* indirizzo);
 int initServer(char* fileConfName);
 int createThreads(void);
-void collectThreads(void);
 
+// funzioni di terminazione e segnali
+void collectThreads(void);
 int setNewHand(void);
 void exitFun(void);
 void sigIntQuit(int);
 void sigHup(int);
 
+// gestisce le connessioni
 void dispatcher(void);
 // ritorna il massimo FD da ascoltare
 int updatemax(fd_set set, int maxFD);
 
+// genera il file di log
 void* logThread(void*);
 
-// il puntatore a intero passato indica il suo posto nell'array
+// prende come argomento un puntatore a intero
 void* worker(void*);
 // esegue una richiesta
 void manageRequest(Request* req, int threadId);
+
 // ret -1 errore
 // ret 0 delayed
 // ret 1 utilizzabile
 // non effettua controlli sugli argomenti passati
 int tryUse(TreeNode* nodePtr, Request* req, int closeOnFail);
 // ritorna 1 se il file puo' essere usato da un client
-// ritorna 0 se il file e' lockato da un altro client 
+// ritorna 0 altrimenti 
 int fileUsePermitted(int client, ServerFile* filePtr);
 
 // chiude la connessione con il client
@@ -128,7 +133,7 @@ void sendClientFatalError(int sock, int err);
 
 int main(int argc, char* argv[]){
 
-	// bloccare i segnali
+	// blocco i segnali
 	sigset_t newSet;
 	sigemptyset(&newSet);
 	sigaddset(&newSet, SIGINT);
@@ -163,12 +168,15 @@ int main(int argc, char* argv[]){
 		return -1;
 	}
 
+	// riattivo i segnali
 	sigaddset(&oldSet, SIGPIPE);
 	pthread_sigmask(SIG_SETMASK, &oldSet, NULL);
 	
 	dispatcher();
 
 	collectThreads();
+
+	return 0;
 }
 
 int initServer(char* fileConfName){
@@ -182,8 +190,6 @@ int initServer(char* fileConfName){
 		return -1;
 	}
 	
-
-	// leggere argv
 	
 	if (fileConfName != NULL){
 		readConfig(fileConfName);
@@ -206,26 +212,19 @@ int initServer(char* fileConfName){
 	unlink(srvGen.sockName);
 	SOCKET(SOCKET_FD);
 
-	//assegno un indirizzo al socket
-	//struttura generica specializzata di volta in volta
+	// assegno un indirizzo al socket
 	struct sockaddr_un sa;
 	memset(&sa, 0, sizeof(sa));
-	//inizializzo con i valori giusti
 	strncpy(sa.sun_path, srvGen.sockName,UNIX_PATH_MAX);
 	sa.sun_family=AF_UNIX;
-				//cast neccessario		
-	if( bind(SOCKET_FD,(struct sockaddr *) &sa, sizeof(sa) ) ){//creo socket
+	if( bind(SOCKET_FD,(struct sockaddr *) &sa, sizeof(sa) ) ){
 		perror("bind");
 		exit(1);
 	}
-	//tiene un po' di persone in coda per non rifiuare 
-	//se il server non e' subito pronto ad accettarle
 	if(listen(SOCKET_FD,SOMAXCONN)){
 		perror("listen");
 		exit(1);
 	}
-
-	
 
 	return 0;
 }
@@ -255,7 +254,6 @@ void collectThreads(void){
 	for(size_t i = 0; i < srvGen.n_worker; i++){
 		nullSended += insert(srvGen.toServe, NULL);
 	}
-	printf("aspetto i thread\n");
 	int* threadRet;
 	if(nullSended >= srvGen.n_worker){
 		for(int i = 0; i < srvGen.n_worker; i++){
@@ -264,7 +262,6 @@ void collectThreads(void){
 			free(srvGen.threadUse[i]);
 		}
 	}
-	printf("aspetto il log\n");
 	LogOp* endLog = newLogOp(0, NULL, SERVER, 0, 0, 0, 0);
 	if(insert(logQueue, endLog) == 0){
 		destroyLogOp(endLog);
@@ -360,7 +357,7 @@ void dispatcher(void){
 		for(size_t fd = 0; fd <= maxFD; fd++){
 			if(FD_ISSET(fd, &rdSet)){
 				if(fd == SOCKET_FD){
-					//ritorna un fd del scket che useremo per comunicare
+					//ritorna il fd del scket per comunicare
 					newConn = accept(SOCKET_FD ,NULL, 0);
 					if(newConn == -1){
 						/* ACCEPT ERROR */
@@ -629,19 +626,6 @@ void* logThread(void* arg){
 				fprintf(filePtr, "file rem = %d freed mem = %d | ", FILE_REMOVED(toWrite), FREED_MEMORY(toWrite));
 			}
 		}
-		// if(LRU_NEW_MAX(toWrite)){
-		// 	switch(NEW_MAX_TIPE(toWrite)){
-		// 	case MAXDIM:
-		// 		fprintf(filePtr, "MAX dim = %d curr n file = %d | ", NEW_DIM(toWrite), NEW_FILE_N(toWrite));
-		// 	break;
-		// 	case MAXFILE:
-		// 		fprintf(filePtr, "curr dim = %d MAX n file = %d | ", NEW_DIM(toWrite), NEW_FILE_N(toWrite));
-		// 	break;
-		// 	case MAXALL:
-		// 		fprintf(filePtr, "MAX dim = %d MAX n file = %d | ", NEW_DIM(toWrite), NEW_FILE_N(toWrite));
-		// 	break;
-		// 	}
-		// }
 		if(SERV_CLOSE(toWrite)){
 			fprintf(filePtr, "%d : N file = %d DIM tot = %d | ",toWrite->client, fileStorage->fileCount, fileStorage->filedim);
 			fprintf(filePtr, "MAX file = %d MAX dim = %d | ", fileStorage->maxUsedFile, fileStorage->maxUsedSpace);
@@ -665,7 +649,7 @@ void* logThread(void* arg){
 			nodeCurr = nodeCurr->lessRecentLRU;
 		}
 	}
-	printf("non scrivo nel file piccione\n");
+	printf("log terminato\n");
 	fclose(filePtr);
 	return NULL;
 }
@@ -675,7 +659,7 @@ void* worker(void* idThread){
 	
 	int threadId = *((int*) idThread);
 	free(idThread);
-printf("ciao, sono nato %d\n", threadId);
+	printf("creato %d\n", threadId);
 	int* readSocK;
 	while (1){
 	
@@ -718,8 +702,6 @@ void manageRequest(Request* req, int threadId){
 			/* non dovrebbe arrivare qui' */
 			DISCONN_CLIENT(req->client);
 			printf("CLOSE_CONNECTION\n");
-printf("completato\n");
-fflush(stdout);
 		break;
 		case OPEN_FILE:
 			printf("OPEN_FILE\n");
@@ -732,7 +714,6 @@ fflush(stdout);
 						result = openFileW(req, &nodePtr, threadId);
 					} else {
 						/* file trovato (eseguo la richiesta) */
-						// da sistemare per delayed
 						switch(tryUse(nodePtr, req, FALSE)){
 						case -1:
 							result = FAILED_STOP;
@@ -776,8 +757,6 @@ fflush(stdout);
 					}
 				}
 			}
-printf("completato\n");
-fflush(stdout);
 		break;
 		case READ_FILE:
 			printf("READ_FILE\n");
@@ -788,7 +767,6 @@ fflush(stdout);
 						sendClientFatalError(req->client, NO_SUCH_FILE_F);
 						result = FAILED_STOP;
 					} else {
-						/* file trovato (eseguo la richiesta) */
 						switch(tryUse(nodePtr, req, FALSE)){
 						case -1:
 							result = FAILED_STOP;
@@ -805,14 +783,10 @@ fflush(stdout);
 			} else {
 				result = readFileW(req, nodePtr, threadId);
 			}
-printf("completato\n");
-fflush(stdout);
 		break;
 		case READ_N_FILES:
 			printf("READ_N_FILES\n");
 			readNFilesW(req, threadId);
-printf("completato\n");
-fflush(stdout);
 		break;
 		case WRITE_FILE:
 			printf("WRITE_FILE\n");
@@ -823,7 +797,6 @@ fflush(stdout);
 						sendClientFatalError(req->client, NO_SUCH_FILE_F << 24);
 						result = FAILED_STOP;
 					} else {
-						/* file trovato (eseguo la richiesta) */
 						switch(tryUse(nodePtr, req, FALSE)){
 						case -1:
 							result = FAILED_STOP;
@@ -840,8 +813,6 @@ fflush(stdout);
 			} else {
 				result = writeFileW(req, nodePtr, threadId);
 			}
-printf("completato\n");
-fflush(stdout);
 		break;
 		case APPEND_TO_FILE:
 			printf("APPEND_TO_FILE\n");
@@ -852,7 +823,6 @@ fflush(stdout);
 						sendClientFatalError(req->client, NO_SUCH_FILE_F << 24);
 						result = FAILED_STOP;
 					} else {
-						/* file trovato (eseguo la richiesta) */
 						switch(tryUse(nodePtr, req, TRUE)){
 						case -1:
 							result = FAILED_STOP;
@@ -869,8 +839,6 @@ fflush(stdout);
 			} else {
 				result = appendToFileW(req, nodePtr, threadId, APPEND_TO_FILE);
 			}
-printf("completato\n");
-fflush(stdout);
 		break;
 		case LOCK_FILE:
 			printf("LOCK_FILE\n");
@@ -897,8 +865,6 @@ fflush(stdout);
 			} else {
 				result = lockFileW(req, nodePtr, threadId);
 			}
-printf("completato\n");
-fflush(stdout);
 		break;
 		case UNLOCK_FILE:
 			printf("UNLOCK_FILE\n");
@@ -925,8 +891,6 @@ fflush(stdout);
 			} else {
 				result = unlockFileW(req, nodePtr, threadId);
 			}
-printf("completato\n");
-fflush(stdout);
 		break;
 		case CLOSE_FILE:
 			printf("CLOSE_FILE\n");
@@ -937,7 +901,6 @@ fflush(stdout);
 						sendClientFatalError(req->client, NO_SUCH_FILE_F);
 						result = FAILED_STOP;
 					} else {
-						/* file trovato (eseguo la richiesta) */
 						switch(tryUse(nodePtr, req, FALSE)){
 						case -1:
 							result = FAILED_STOP;
@@ -954,8 +917,6 @@ fflush(stdout);
 			} else {
 				result = closeFileW(req, nodePtr, threadId);
 			}
-printf("completato\n");
-fflush(stdout);
 		break;
 		case REMOVE_FILE:
 			printf("REMOVE_FILE\n");
@@ -966,7 +927,6 @@ fflush(stdout);
 						sendClientFatalError(req->client, NO_SUCH_FILE_F);
 						result = FAILED_STOP;
 					} else {
-						/* file trovato (eseguo la richiesta) */
 						switch(tryUse(nodePtr, req, FALSE)){
 						case -1:
 							result = FAILED_STOP;
@@ -983,8 +943,6 @@ fflush(stdout);
 			} else {
 				result = removeFileW(req, nodePtr, threadId);
 			}
-printf("completato\n");
-fflush(stdout);
 		break;
 		default:
 			printf("operazione sconosciuta ");
@@ -1026,7 +984,6 @@ fflush(stdout);
 
 	}while( req != NULL && (result == FAILED_CONT || result == COMPLETED_CONT) );
 	
-	// non credo si possa fare senza lock
 	if(nodePtr != NULL && result != FILE_DELETED && result != DELAYED){
 		if(startMutexTreeFile(fileStorage) == 0){
 			if(Pthread_mutex_lock( &(nodePtr->lock) ) == 0){
@@ -1070,8 +1027,6 @@ TreeNode* getFileFromSocket(Request* req, enum operResult* result, int threadId)
 		if( readFormSocket(req->client, req->sFileName, dim + 1) == 0){
 			/* tutto ok */
 			req->sFileName[dim] = '\0';
-			printf("file %s\n", req->sFileName);
-			fflush(stdout);
 			nodePtr = TreeFileFind(fileStorage, req->sFileName);
 			if(errno != 0){
 				sendClientError(req->client, UNKNOWN_ERROR);
@@ -1181,8 +1136,6 @@ int fileUsePermitted(int client, ServerFile* filePtr){
 }
 
 		// preparo la prossima operazione
-		// se il file e' loked non devo 
-		// se sono il possessore della lock dopo la mia operazione il thread deve smettere
 		// usare 'completed_stop' o come si chiama quando eseguo un' operazione
 		// in mutua esclusione
 int closeConnectionW(int client){
@@ -1522,7 +1475,7 @@ int appendToFileW(Request* req, TreeNode* nodePtr, int threadId, int logOpKind){
 		int dataDimFreed = 0;
 		GeneralList* toRem = makeSpace(fileStorage, 0, missingSpace);
 		// controllare se devo ritornare il contenuto
-		printf("checkpoint 0 spazio richiesto %d\n", missingSpace);
+		printf("spazio richiesto %d\n", missingSpace);
 		if(toRem == NULL){
 			endMutexTreeFile(fileStorage);
 			sendClientError(req->client, (NO_MEMORY << 24));
@@ -1814,7 +1767,6 @@ int removeFileW(Request* req, TreeNode* nodePtr, int threadId){
 	return COMPLETED_STOP;
 }
 
-// informare il log?
 void informClientDelete(ServerFile* filePtr, int threadId){
 	int op, buffInt;
 	LogOp* infoLog;
