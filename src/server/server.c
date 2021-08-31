@@ -262,7 +262,7 @@ void collectThreads(void){
 			free(srvGen.threadUse[i]);
 		}
 	}
-	LogOp* endLog = newLogOp(0, NULL, SERVER, 0, 0, 0, 0);
+	LogOp* endLog = newLogOp(0, NULL, SERVER, SERVER, 0, 0, 0);
 	if(insert(logQueue, endLog) == 0){
 		destroyLogOp(endLog);
 	} else {
@@ -588,6 +588,7 @@ int updatemax(fd_set set, int maxFD){
 void* logThread(void* arg){
 	FILE * filePtr = NULL;
 	filePtr = fopen(srvGen.logName, "a+");
+	int lruCount = 0;
 	if(filePtr == NULL){
 		printf("fileNotFound\n");
 		return NULL;
@@ -596,7 +597,7 @@ void* logThread(void* arg){
 	fprintf(filePtr, "\nAPERTURA SERVER %s", ctime(&approxTime));
 	LogOp* toWrite = pop(logQueue);
 	while(toWrite != NULL){
-		fprintf(filePtr, "%3d : %3d : ", toWrite->client, toWrite->thread);
+		fprintf(filePtr, "%3d : (%3d) : ", toWrite->client, toWrite->thread);
 		if(CLIENT_OP(toWrite)){
 			fprintf(filePtr, "%2d %17s | ", toWrite->opType, operatToString(toWrite->opType, FALSE));
 			fprintf(filePtr, "res = %d | ", toWrite->result);
@@ -620,6 +621,7 @@ void* logThread(void* arg){
 			fprintf(filePtr, "ret dim = %d |", toWrite->dimReturn);
 		}
 		if(LRU_REPLACE(toWrite)){
+			lruCount++;
 			if(FILE_REMOVED(toWrite) == 1 && toWrite->fileName != NULL){
 				fprintf(filePtr, "file rem = %s freed mem = %d  | ", toWrite->fileName, FREED_MEMORY(toWrite));
 			} else {
@@ -627,8 +629,9 @@ void* logThread(void* arg){
 			}
 		}
 		if(SERV_CLOSE(toWrite)){
-			fprintf(filePtr, "%d : N file = %d DIM tot = %d | ",toWrite->client, fileStorage->fileCount, fileStorage->filedim);
-			fprintf(filePtr, "MAX file = %d MAX dim = %d | ", fileStorage->maxUsedFile, fileStorage->maxUsedSpace);
+			fprintf(filePtr, "%d : N file = %d DIM tot = %d\n",toWrite->client, fileStorage->fileCount, fileStorage->filedim);
+			fprintf(filePtr, "MAX file = %d | MAX dim = %d\n", fileStorage->maxUsedFile, fileStorage->maxUsedSpace);
+			fprintf(filePtr, "LRU call = %d | MAX con = %d\n", lruCount, srvGen.clientMax);
 		}
 		
 		
@@ -645,7 +648,7 @@ void* logThread(void* arg){
 	TreeNode* nodeCurr = fileStorage->mostRecentLRU;
 	while(nodeCurr != NULL){
 		if(nodeCurr->sFile != NULL){
-			fprintf(filePtr, "%s\n", nodeCurr->name);
+			fprintf(filePtr, "%s, dim %d\n", nodeCurr->name, nodeCurr->sFile->dim);
 			nodeCurr = nodeCurr->lessRecentLRU;
 		}
 	}
@@ -1186,7 +1189,7 @@ int openFileW(Request* req, TreeNode** nodePtrP, int threadId){
 			int res = SUCCESS;
 			*nodePtrP = nodePtr;
 			if(toRemove != NULL && expelled != NULL){
-				logInfo = newLogOp(REMOVE_FILE, expelled->namePath, LRU_ALG, 0, 1, expelled->dim, 1);
+				logInfo = newLogOp(REMOVE_FILE, expelled->namePath, LRU_ALG, threadId, 1, expelled->dim, 1);
 				LOG_INSERT(logInfo);
 				clientFileDel(toRemove, resourceTable, expelled);
 				informClientDelete(expelled, threadId);
@@ -1212,7 +1215,7 @@ int openFileW(Request* req, TreeNode** nodePtrP, int threadId){
 		break;
 		case EPERM:
 			if(toRemove != NULL && expelled != NULL){
-				logInfo = newLogOp(REMOVE_FILE, expelled->namePath, LRU_ALG,0, 1, expelled->dim, 1);
+				logInfo = newLogOp(REMOVE_FILE, expelled->namePath, LRU_ALG, threadId, 1, expelled->dim, 1);
 				LOG_INSERT(logInfo);
 				clientFileDel(toRemove, resourceTable, expelled);
 				informClientDelete(expelled, threadId);
